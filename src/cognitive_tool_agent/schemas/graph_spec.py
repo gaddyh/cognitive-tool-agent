@@ -9,6 +9,8 @@ from pydantic import BaseModel
 NodeRole = Literal[
     "perceive",
     "reason",
+    "grounding",
+    "memory",
     "readiness",
     "plan",
     "act",

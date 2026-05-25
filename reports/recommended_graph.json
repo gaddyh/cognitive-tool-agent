@@ -1,0 +1,141 @@
+{
+  "graph_spec": {
+    "id": "recommended_memory_grounding_readiness_deep_planning",
+    "nodes": [
+      {
+        "id": "perceive",
+        "role": "perceive",
+        "model_hint": "stub",
+        "prompt_template": null,
+        "input_schema": null,
+        "output_schema": null
+      },
+      {
+        "id": "reason",
+        "role": "reason",
+        "model_hint": "stub",
+        "prompt_template": null,
+        "input_schema": null,
+        "output_schema": null
+      },
+      {
+        "id": "grounding",
+        "role": "grounding",
+        "model_hint": "stub",
+        "prompt_template": null,
+        "input_schema": null,
+        "output_schema": null
+      },
+      {
+        "id": "readiness",
+        "role": "readiness",
+        "model_hint": "stub",
+        "prompt_template": null,
+        "input_schema": null,
+        "output_schema": null
+      },
+      {
+        "id": "plan",
+        "role": "plan",
+        "model_hint": "stub",
+        "prompt_template": null,
+        "input_schema": null,
+        "output_schema": null
+      },
+      {
+        "id": "act",
+        "role": "act",
+        "model_hint": "stub",
+        "prompt_template": null,
+        "input_schema": null,
+        "output_schema": null
+      },
+      {
+        "id": "learn",
+        "role": "learn",
+        "model_hint": "stub",
+        "prompt_template": null,
+        "input_schema": null,
+        "output_schema": null
+      }
+    ],
+    "edges": [
+      {
+        "from_node": "perceive",
+        "to_node": "reason",
+        "condition": null
+      },
+      {
+        "from_node": "reason",
+        "to_node": "grounding",
+        "condition": null
+      },
+      {
+        "from_node": "grounding",
+        "to_node": "readiness",
+        "condition": null
+      },
+      {
+        "from_node": "readiness",
+        "to_node": "plan",
+        "condition": null
+      },
+      {
+        "from_node": "plan",
+        "to_node": "act",
+        "condition": null
+      },
+      {
+        "from_node": "act",
+        "to_node": "learn",
+        "condition": null
+      }
+    ],
+    "latency_estimate": 1.0,
+    "cost_estimate": 1.0
+  },
+  "memory_required": true,
+  "readiness_required": true,
+  "parallel_lookup_nodes": false,
+  "rationale": [
+    "perceive always included (signal extraction baseline)",
+    "plan + act always included (core action execution)",
+    "reason included: avg_chain_depth=3.04 exceeds reasoning threshold",
+    "grounding included: grounding_strength=0.85 — NL→structured mapping required",
+    "readiness included: readiness_strength=0.43 — write-risk gate required",
+    "learn included: chaining_strength=0.54 — persistent state/memory required"
+  ],
+  "required_capabilities": {
+    "memory": {
+      "required": true,
+      "strength": 0.541,
+      "evidence": [
+        "89.9% of 'order_id' values are tool-chained"
+      ]
+    },
+    "grounding": {
+      "required": true,
+      "strength": 0.852,
+      "evidence": [
+        "85.2% of 'item_ids' values require grounding (peak arg, 88 instances)",
+        "global grounding_strength=0.151 (diluted by high-volume zero-grounding args)"
+      ]
+    },
+    "readiness": {
+      "required": true,
+      "strength": 0.433,
+      "evidence": [
+        "write actions comprise 26 of 60 failures",
+        "write_fraction=0.19"
+      ]
+    },
+    "deep_planning": {
+      "required": true,
+      "strength": 0.608,
+      "evidence": [
+        "avg chain depth is 3.04 across tools"
+      ]
+    }
+  },
+  "confidence": 0.609
+}

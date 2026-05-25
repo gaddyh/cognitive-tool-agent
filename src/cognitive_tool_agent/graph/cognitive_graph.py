@@ -110,6 +110,11 @@ class GraphExecutor:
         elif role == "monolithic":
             ctx.plan, ctx.action = _run_monolithic(user_input, ctx.registry)
 
+        elif role in ("grounding", "memory"):
+            raise NotImplementedError(
+                f"Node role {role!r} is recommender-only in v1 and has no executor implementation yet."
+            )
+
         else:
             raise ValueError(f"Unknown node role: {role!r}")
 
