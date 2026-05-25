@@ -1,452 +1,688 @@
-# Cognitive Graph Lab
+# Cognitive Tool Agent
 
-**Dataset-to-Agent-Architecture Lab.** Given a behavioral dataset of tool-calling
-traces, infer the *cognitive topology* a task actually requires, recommend an
-executable agent graph that covers those requirements, run it against baselines,
-and surface where the graph still falls short.
+A dataset-to-agent-architecture lab for evaluation-driven tool-calling systems.
 
-This is not just a runtime agent. It is a lab for **discovering the right runtime
-graph from measurable evidence.**
+This repo explores a concrete thesis:
 
----
+> Tool-agent failures are not one blob.  
+> They can be decomposed into measurable cognitive spaces, and the right graph should be justified by dataset evidence, not architectural taste.
 
-## 1. The Core Idea
-
-Most tool-calling agents are built as one giant prompt that does everything at
-once - perceive, reason, look things up, check policy, plan, act, learn. When
-such an agent fails, you cannot tell *which* of those jobs broke, because they
-are all tangled together in a single step.
-
-This project takes the opposite approach. It splits cognition into **separate
-single-job stages**, each with a typed input and a typed output, so that:
-
-1. every stage's work is individually inspectable, and
-2. a failure can be attributed to a specific stage.
-
-On top of that sits one hypothesis, which is the whole reason the lab exists:
-
-> **Behavioral datasets contain recoverable cognitive topology.**
-
-Meaning: if you look at *how* tasks actually unfold in the data, the data itself
-tells you which cognitive stages the task needs - instead of you guessing and
-hand-tuning a prompt. The guiding rule throughout is:
-
-> **No optimization before measurement.**
-
-Measure what the task requires first; design (and later, optimize) second.
+The current focus is tau2-style retail tool-agent traces. The repo converts raw simulations into cognitive artifacts, infers capability pressure, recommends a graph, and evaluates graph variants against turn-level tool-call decisions.
 
 ---
 
-## 2. The Pipeline (end to end)
+## Current status
 
-```
-Raw behavioral traces (tau-bench-style results.json)
-  |
-  v  trace_converter/        deterministic - no LLM
-Cognitive dataset artifacts
-  (tool registry, action sequences, per-turn supervision, failure rows)
-  |
-  v  reports/
-Cognitive topology reports
-  (cognitive burden, argument emergence, failure heatmap)
-  |
-  v  recommender/
-Capability inference  ->  Recommended GraphSpec
-  |
-  v  graph_runner/ + graph/
-Multi-graph evaluation
-  (monolithic, minimal, recommended_stub, recommended_oracle)
-  |
-  v  recommender/revision_advisor.py
-Graph revision suggestions
+The repo now has a working evaluation loop:
+
+```text
+tau2 results.json
+   ↓
+trace conversion
+   ↓
+cognitive dataset artifacts
+   ↓
+dataset reports + capability inference
+   ↓
+recommended cognitive graph
+   ↓
+turn-level graph evaluation
+   ↓
+stub vs deterministic vs oracle comparison
 ```
 
-Every stage is **deterministic and inspectable today.** No LLM calls are made
-anywhere yet - each cognitive stage runs a documented stub heuristic, and exposes
-a slot where a real model will later be plugged in.
+The most important current result:
 
----
-
-## 3. The Cognitive Graph
-
-A `GraphSpec` is a set of typed **nodes** connected by **edges**, executed in
-dependency order. Each node has a `role`; each role maps to an agent.
-
-```
-perceive -> reason -> grounding -> readiness -> plan -> act -> learn
+```text
+recommended_stub           2% E2E /  0% argument match
+recommended_deterministic 39% E2E / 23% argument match
+recommended_oracle       100% E2E / 99% argument match
 ```
 
-| Node        | Agent            | Job (current stub behavior)                                      |
-| ----------- | ---------------- | ---------------------------------------------------------------- |
-| `perceive`  | `PerceiveAgent`  | Intent candidates, entity mentions, ambiguity detection          |
-| `reason`    | `ReasonAgent`    | Tool selection, entity resolution, missing-requirement detection |
-| `grounding` | `GroundingAgent` | Resolve references to concrete IDs/values                        |
-| `readiness` | `ReadinessAgent` | Policy enforcement, confirmation gating, required fields         |
-| `plan`      | `PlanAgent`      | Next action: `execute_tool` / `ask_followup` / `reject`          |
-| `act`       | `ActAgent`       | Tool execution result or user-facing response                    |
-| `learn`     | `LearnAgent`     | Runtime memory update, trace summary                             |
+This means the system now has a measurable grounding gap:
 
-Not every task needs every node. The point of the lab is to infer the **minimal
-sufficient graph** for a given dataset.
-
-> **`memory` is recommender-only.** The recommender can decide a task *needs*
-> memory, but there is no executable `memory` node - that capability is mapped
-> onto the `learn` node. A hand-crafted graph containing a literal `memory` node
-> will deliberately raise an error rather than silently do nothing.
-
----
-
-## 4. How Execution Works **Today** (current code)
-
-This section describes what is actually in the repository right now. Section 7
-describes the refactor that changes it.
-
-### Typed contracts between stages
-
-Stages never pass each other free-form text. Each one emits a **typed Pydantic
-result** - `PerceptionResult`, `ReasoningResult`, etc. - with named fields and
-validated values (e.g. a confidence score is forced into `0.0-1.0`). If a stage
-produces the wrong shape, the error fires *at that handoff*, not three stages
-later. These contracts are what make "you can tell which stage broke" true in
-practice.
-
-### The trace: one evidence file per run
-
-As stages run, each result is attached to a single `CognitiveTrace` with one slot
-per stage (`perception`, `reasoning`, ... `learning`), each either filled or
-`None`. The trace is your detective's evidence file: after a run you can read the
-entire cognitive chain and see exactly where it went wrong. The `None` slots also
-show which stages a task didn't even use.
-
-### The executor
-
-`GraphExecutor` reads a `GraphSpec`, computes a valid execution order, and runs
-each node. The order is **data-driven**: `GraphSpec.topological_order()` runs
-Kahn's algorithm over the edges, which both orders the nodes by dependency *and*
-detects cycles for free (a graph that can't be ordered is rejected).
-
-**The current limitation this README is honest about:** while *order* comes from
-the edges, the *data passed between stages* is still hardcoded inside the
-executor. The dispatch method literally contains:
-
-```python
-ctx.reasoning = self._reason.run(user_input, ctx.perception)
-ctx.plan      = self._plan.run(user_input, ctx.reasoning, ctx.readiness)
+```text
+stub < deterministic < oracle
 ```
 
-So "reason consumes perception" and "plan consumes reasoning + readiness" live in
-Python, not in the graph spec. The edges and this hardcoded wiring are *two*
-descriptions of the same dependencies - and the hardcoded one wins. Removing that
-duplication is the refactor described in Section 7.
-
-### The model seam (not yet live)
-
-Each agent is built to run in a `mode` (`stub` today; `llm` later) and accepts a
-`model_adapter` - the standard plug a real model will fit into. **Today this seam
-is scaffolding:** the adapter is accepted but not yet consulted, and the LLM code
-paths raise "not implemented." Making this seam real, one node at a time, is the
-main roadmap (Section 8).
-
-`GroundingAgent` is the most-developed stage and previews the pattern: it already
-runs in three modes - `stub` (heuristic), `oracle` (fed the correct answers, to
-measure a ceiling), and `disabled`.
+The deterministic grounding node closes a real part of the oracle gap without using labels.
 
 ---
 
-## 5. How "the data reveals the topology" actually works
+## Why this repo exists
 
-This is counting, not magic. The converter reads the example traces and computes
-**signals** per tool - most importantly the **argument emergence matrix**, which
-asks where each tool argument *comes from*:
+Most agent development looks like this:
 
-| Argument type                              | Typical origin                                |
-| ------------------------------------------ | --------------------------------------------- |
-| `first_name`, `last_name`, `zip`           | explicit in the user's text                   |
-| `order_id`, `user_id`, `payment_method_id` | chained from a previous tool's result         |
-| `item_ids`, `new_item_ids`                 | grounded from natural language + tool results |
-
-The key insight: **"argument extraction" is not one capability.** A `zip` you
-read off the message; an `order_id` you must remember from an earlier call; an
-`item_id` you must *ground* from fuzzy language. Different origins demand different
-machinery - which is exactly what tells you which stages the task needs.
-
-`recommender/thresholds.py` then turns those signals into capability flags:
-
-| Capability      | Triggered by                                  |
-| --------------- | --------------------------------------------- |
-| `memory`        | high tool-chaining across arguments           |
-| `grounding`     | high global *or* peak grounding pressure      |
-| `readiness`     | write/action risk and write-failure fraction  |
-| `deep_planning` | high average tool-chain depth                 |
-
-Grounding uses both an **average** and a **peak** signal, so a flood of trivial
-zero-grounding arguments can't statistically bury one rare-but-critical argument
-like `item_ids`.
-
-**Honest caveat:** these thresholds are hand-set today. So the "inference" is
-currently as good as the cutoffs chosen - the same human intuition the project
-critiques, relocated from prompt-writing to threshold-setting. Making the
-thresholds *learned from which graphs actually win* is the real long-term step.
-
----
-
-## 6. The Evaluation Harness - and why the oracle matters
-
-`run_graph_evaluation.py` runs four graph variants over the dataset:
-
-| Variant              | Graph                                        | Role                              |
-| -------------------- | -------------------------------------------- | --------------------------------- |
-| `monolithic`         | plan->act, starved of upstream cognition     | floor baseline                    |
-| `minimal`            | `perceive -> plan -> act`                    | minimal decomposition             |
-| `recommended_stub`   | full recommended graph, stub grounding       | what we'd ship today              |
-| `recommended_oracle` | full recommended graph, **oracle** grounding | ceiling if grounding were perfect |
-
-The **stub-vs-oracle gap** is the single most important measurement in the repo:
-`recommended_stub` and `recommended_oracle` are the *same topology* run with one
-knob changed (grounding mode). The gap isolates how much remaining failure is due
-to **grounding quality** specifically, versus **graph structure**. The
-`GraphRevisionAdvisor` reads that gap and, when oracle beats stub by enough, flags
-grounding as the bottleneck and recommends building a real grounding agent -
-rather than blaming topology.
-
-This is the empirical loop working as intended: the system measures something it
-did *not* presuppose.
-
----
-
-## 7. The Edge-Driven Wiring Refactor (in flight)
-
-> **Status: planned / in progress - NOT yet merged.** The code today still uses
-> the hardcoded wiring described in Section 4. This section explains what is
-> changing and why, so the design is understandable end to end.
-
-### The problem being solved
-
-As noted in Section 4, dependencies are described twice: once in the graph's
-edges (which only control *order*), and once hardcoded in the executor (which
-controls *what data flows*). Two sources of truth for the same fact, and the
-hardcoded one silently wins. This means the graph spec does **not** fully describe
-a run - the real data-flow is hidden in Python.
-
-The goal of the refactor: **make the spec the single source of truth for both
-order *and* the data that flows between nodes.** After it, the executor becomes a
-true graph interpreter - the `GraphSpec` is the program, and the executor just
-runs whatever graph it's handed.
-
-### Change 1 - every agent gets one uniform shape
-
-Today the agents have mismatched signatures (`perceive` takes 1 argument, `plan`
-takes 3, `act` wants the registry, `learn` wants the whole trace). You cannot make
-edges drive wiring while every agent expects different positional arguments. So
-every agent is collapsed to a single shape:
-
-```python
-def run(self, ctx: NodeInput) -> SomeResult: ...
+```text
+prompt → run → fail → tweak prompt → run again
 ```
 
-`NodeInput` is a small bundle the executor assembles per node. It has two kinds of
-fields:
+This repo is moving toward:
 
-- **Ambient** (always available): `user_input`, `registry`, `row`, and - for the
-  `learn` node only - `trace_so_far`.
-- **Edge-supplied** (filled *only* if an incoming edge provides them):
-  `perception`, `reasoning`, `grounding`, `readiness`, `plan`, `action`.
-
-### Change 2 - `monolithic` stops being a node
-
-`monolithic` was never a real cognitive stage - it's just "plan then act with no
-upstream cognition," which is simply a **graph shape**. So it's re-expressed as a
-two-node graph (`plan -> act`, no upstream edges) via `make_monolithic_baseline()`,
-and the `monolithic` node role becomes a fail-loud tripwire (same pattern as
-`memory`). A safety-net equivalence test asserts the old monolithic code path and
-the new two-node graph produce *identical* results on every dev row - so the floor
-baseline the oracle gap is measured against doesn't silently shift.
-
-### Change 3 - edges carry the payload
-
-`EdgeSpec` gains a `provides` field naming what flows along that edge:
-
-```python
-class EdgeSpec(BaseModel):
-    from_node: str
-    to_node: str
-    provides: str | None = None   # None = "whatever this role canonically produces"
-    condition: str | None = None
+```text
+dataset → metrics → baseline → failure analysis → capability isolation → graph revision → reevaluation
 ```
 
-`provides=None` is a *deliberate* default meaning "carry the upstream role's
-canonical output," resolved through a `ROLE_OUTPUT` map (`perceive -> perception`,
-`reason -> reasoning`, ...). This rests on a documented, load-bearing invariant:
-**one canonical output slot per role.** The day a role produces two outputs,
-`provides=None` becomes ambiguous for that role and an explicit value is required.
-An explicit `provides` is validated against `ROLE_OUTPUT` so it can never
-contradict the role.
+The goal is not to build another generic agent framework.
 
-### Change 4 - a load-time wiring validator
-
-Before a single node runs, `validate_wiring()` checks the graph against a
-`ROLE_INPUTS` map: every input a role *requires* must be supplied by some incoming
-edge, no two edges may supply the same slot to the same node, and a few structural
-warnings (e.g. a node placed after `learn`, which would make its output invisible
-to `learn`'s `trace_so_far`). A misconfigured graph now **refuses to start**
-instead of quietly producing a broken trace.
-
-> **Honest limitation:** in the first version, only `act`'s dependency on `plan`
-> is marked *required*; the rest are *optional* because the stub agents tolerate
-> `None`. So the validator catches broken `act` nodes but does not yet *enforce*
-> full-pipeline correctness. A full-pipeline equivalence test is the primary
-> safety net for that until `ROLE_INPUTS` is tightened.
-
-### Change 5 - the dispatch flip
-
-The big `if role == "perceive" ... elif role == "reason" ...` ladder collapses
-into one generic step:
-
-```python
-def _dispatch(self, node, run_ctx, cfg, graph):
-    node_input = self._build_node_input(node, run_ctx, graph)  # gather from incoming edges
-    agent      = self._make_agent(node.role, cfg)              # role -> agent (+ mode/adapter)
-    result     = agent.run(node_input)
-    setattr(run_ctx, ROLE_OUTPUT[node.role], result)
-```
-
-`_build_node_input` looks at the node's **incoming edges**, gathers exactly those
-payloads, and builds a `NodeInput` containing only them plus the ambient fields.
-That last part is the real prize: **a node can only see the upstreams its edges
-declare.** No more hidden god-object; the graph defines the data-flow.
-
-### Before / after, in one line
-
-| Concern            | Today (role-ladder)                         | After (edge-driven)                         |
-| ------------------ | ------------------------------------------- | ------------------------------------------- |
-| Execution order    | from edges (Kahn's algorithm)               | from edges (unchanged)                      |
-| Data between nodes | **hardcoded** in `_dispatch`                | **from edges** (`provides` + `ROLE_INPUTS`) |
-| Agent signatures   | heterogeneous, positional                   | uniform `run(ctx: NodeInput)`               |
-| `monolithic`       | special node branch                         | a plain `plan -> act` graph                 |
-| Bad graph          | runs, silently wrong                        | rejected at load by the validator           |
-
-### The `learn` invariant (why it's safe)
-
-`learn`'s `trace_so_far` is **never** edge-supplied - it is always computed from
-the accumulated `RunContext` at the moment `learn` dispatches. That is correct
-*only because* `learn` is topologically last (every prior result has landed) and
-`to_trace()` reads the full run context. This invariant is documented in the code
-and guarded by the validator, because the narrowing in this refactor must never
-strip it.
+The goal is to make agent architecture measurable.
 
 ---
 
-## 8. Roadmap: introducing LLMs, one node at a time
+## Core thesis
 
-The model seam (Section 4) becomes real *after* the edge-driven refactor lands,
-in measurability order:
+A tool-calling assistant often collapses many different cognitive responsibilities into one prompt:
 
-1. **Phase 0 - make the seam real:** one shared `ModelAdapter`, an injectable
-   per-node config, and a dual-run harness (stub vs LLM scored against existing
-   ground truth). A failing test that asserts "an injected adapter is actually
-   called" is the green gate.
-2. **`perceive`** first - clean entry point, easy to score against extracted
-   entity mentions.
-3. **`grounding`** next - the node your own analysis flags as structurally hard;
-   the first node expected to *beat* the stub, not just match it.
-4. **`reason`**, then **`readiness`** (kept hybrid: hard policy stays
-   deterministic, LLM only judges fuzzy confirmation), then **`plan`/`act`**.
-5. **`learn`** last - least measurable, most experimental.
+```text
+perceive user intent
+select tool
+ground entities
+fill arguments
+check readiness
+plan next action
+execute
+learn/update state
+```
 
-A node only graduates from stub to LLM-default when it **beats the stub on its own
-metric** across the dev set. The stub stays forever as the cheap deterministic
-regression baseline.
+When the agent fails, a single E2E score does not explain why.
+
+This repo decomposes the problem into stages:
+
+```text
+perceive → reason → grounding → readiness → plan → act → learn
+```
+
+Each stage has typed inputs and outputs. Each stage can be stubbed, implemented deterministically, backed by an LLM, or treated as an oracle ceiling.
 
 ---
 
-## 9. Quick Start
+## What has been proven so far
+
+### 1. Trace conversion works
+
+The tau2 retail run is converted into cognitive artifacts.
+
+Current conversion summary:
+
+| Metric | Value |
+|---|---:|
+| Tasks | 100 |
+| Simulations | 100 |
+| Messages | 2,714 |
+| Expected actions | 514 |
+| Actual tool calls | 797 |
+| Matched actions | 427 |
+| Failed actions | 60 |
+
+Generated artifacts:
+
+```text
+data/out/tool_registry.json
+data/out/action_sequence.jsonl
+data/out/turn_supervision.jsonl
+data/out/failure_rows.jsonl
+data/out/conversion_summary.json
+```
+
+This proves the raw tau2 traces contain enough structure to extract action-level, turn-level, and failure-level supervision.
+
+---
+
+### 2. The dataset exposes capability pressure
+
+The report builder computes cognitive pressure signals from the converted artifacts.
+
+Current extended dataset summary:
+
+| Metric | Value |
+|---|---:|
+| Tool entropy | 3.063 bits |
+| Avg tools / simulation | 7.97 |
+| Avg turns before write | 21.1 |
+| Read / write ratio | 4.15 |
+
+Top complexity tools include:
+
+| Tool | Type | Complexity |
+|---|---|---:|
+| modify_user_address | write | 21 |
+| modify_pending_order_address | write | 20 |
+| exchange_delivered_order_items | write | 17 |
+| modify_pending_order_items | write | 17 |
+| return_delivered_order_items | write | 14 |
+| modify_pending_order_payment | write | 13 |
+| cancel_pending_order | write | 12 |
+| get_order_details | read | 8 |
+
+Top argument failure fields:
+
+| Argument | Failure count |
+|---|---:|
+| order_id | 20 |
+| expression | 13 |
+| item_ids | 11 |
+| product_id | 9 |
+| new_item_ids | 7 |
+| state | 7 |
+| zip | 5 |
+| payment_method_id | 4 |
+
+---
+
+### 3. Capability inference recommends the full cognitive graph
+
+The recommender infers these capability requirements:
+
+| Capability | Required | Strength | Evidence |
+|---|---:|---:|---|
+| memory | yes | 0.54 | `order_id` values are heavily tool-chained |
+| grounding | yes | 0.85 | `item_ids` has very high peak grounding pressure |
+| readiness | yes | 0.43 | many failures involve write actions |
+| deep_planning | yes | 0.61 | average chain depth is above threshold |
+
+Recommended graph:
+
+```text
+perceive → reason → grounding → readiness → plan → act → learn
+```
+
+This graph is not chosen by taste. It is justified by dataset signals.
+
+---
+
+## Why the original graph evaluation was all zero
+
+The first graph evaluation compressed each full simulation into one row:
+
+```text
+first user message → selected primary / final-ish action
+```
+
+That was misaligned.
+
+A typical simulation has many turns and many tool calls. The report showed an average of 21.1 turns before write actions. Asking weak stubs to infer a late write action from the first user message produced all zeros.
+
+This was not a graph failure. It was an evaluation-unit mismatch.
+
+---
+
+## Turn-level evaluation
+
+The fix was to evaluate the graph at the correct unit:
+
+```text
+local turn context → next assistant tool call
+```
+
+The new turn-level adapter builds one row per `call_tool` turn from `turn_supervision.jsonl`.
+
+Each row contains:
+
+```text
+user_message
+expected_tool
+expected_arguments
+prior_tool_calls
+prior_tool_results
+conversation_context
+tool registry
+```
+
+This creates 547 turn-level tool-call decision rows.
+
+Example rows:
+
+| Row | Expected tool | Expected args |
+|---|---|---|
+| turn 4 | find_user_id_by_email | email |
+| turn 6 | get_user_details | user_id |
+| turn 10 | get_order_details | order_id |
+| turn 14 | list_all_product_types | `{}` |
+| turn 16 | get_product_details | product_id |
+
+---
+
+## Current graph evaluation results
+
+Full 547-row turn-level evaluation:
+
+| Graph | Nodes | E2E Success | Tool Acc | Arg Match | Grounding |
+|---|---:|---:|---:|---:|---|
+| monolithic | 2 | 0% | 0% | 0% | n/a |
+| minimal | 3 | 0% | 0% | 0% | n/a |
+| recommended_stub | 7 | 2% | 2% | 0% | stub |
+| recommended_deterministic | 7 | 39% | 39% | 23% | deterministic |
+| recommended_oracle | 7 | 100% | 100% | 99% | oracle |
+
+This is the first key proof result:
+
+```text
+A dedicated deterministic grounding node improves the graph from 2% to 39% E2E success without using labels.
+```
+
+---
+
+## Field-level grounding results
+
+Field-level summary for `recommended_deterministic`:
+
+| Argument field | Rows with field | Deterministic resolved | Exact match | Resolve rate | Match rate |
+|---|---:|---:|---:|---:|---:|
+| order_id | 234 | 141 | 78 | 60% | 33% |
+| product_id | 64 | 62 | 18 | 97% | 28% |
+| user_id | 108 | 108 | 108 | 100% | 100% |
+| payment_method_id | 86 | 86 | 71 | 100% | 83% |
+| item_ids | 85 | 0 | 0 | 0% | 0% |
+| new_item_ids | 55 | 0 | 0 | 0% | 0% |
+
+Interpretation:
+
+```text
+Solved:
+- user_id grounding
+- much of payment_method_id grounding
+
+Partially solved:
+- order_id grounding
+- product_id grounding
+
+Not solved yet:
+- item_ids
+- new_item_ids
+```
+
+This is the point of the architecture: failures are no longer opaque. They are localized by field and capability.
+
+---
+
+## Grounding modes
+
+The grounding node currently supports several modes:
+
+| Mode | Meaning |
+|---|---|
+| stub | Returns little/no resolved grounding. Baseline floor. |
+| deterministic | Uses prior tool calls, prior tool results, and explicit text patterns. No labels. |
+| oracle | Copies expected arguments from the dataset row. Ceiling only. |
+| llm | Reserved for future model-backed grounding. |
+| disabled | Used when grounding is intentionally removed. |
+
+The oracle is not a production solution. It is a measurement instrument.
+
+It answers:
+
+```text
+If grounding were perfect, could the rest of the graph use it?
+```
+
+The answer is now yes.
+
+---
+
+## Deterministic grounding
+
+Deterministic grounding is a conservative schema-aware lookup layer.
+
+It receives:
+
+```text
+selected_tool
+selected_tool.required_fields
+user_message
+prior_tool_calls
+prior_tool_results
+conversation_context
+```
+
+It outputs:
+
+```text
+resolved_args
+unresolved_fields
+```
+
+It is forbidden from using:
+
+```text
+row.expected.expected_arguments
+row.expected.expected_tool
+```
+
+Current Pass 1 resolves scalar IDs:
+
+| Field | Strategy |
+|---|---|
+| order_id | prior tool call args, prior tool result JSON, `#W...` regex |
+| user_id | prior tool call args, prior tool result JSON, user-id-like result strings |
+| product_id | prior tool call args, prior tool result JSON, conservative product type matching |
+| payment_method_id | prior tool call args, prior tool result JSON |
+| generic `*_id` | same-key lookup in prior calls/results |
+
+Deferred to Pass 2:
+
+```text
+item_ids
+new_item_ids
+```
+
+These require item-list and product-variant grounding, not simple scalar lookup.
+
+---
+
+## Architecture
+
+Current package layout:
+
+```text
+src/cognitive_tool_agent/
+  adapters/
+  agents/
+  datasets/
+  evals/
+  graph/
+  graph_builder/
+  graph_runner/
+  recommender/
+  reports/
+  schemas/
+  tools/
+  trace_converter/
+```
+
+Important modules:
+
+| Module | Responsibility |
+|---|---|
+| `trace_converter` | Converts raw tau2 traces into cognitive artifacts |
+| `reports` | Builds dataset reports, topology reports, failure heatmaps |
+| `recommender` | Infers required capabilities and recommends graph topology |
+| `graph` | Executes cognitive graphs with edge-driven dispatch |
+| `agents` | Implements cognitive stage stubs, deterministic logic, and oracle modes |
+| `graph_runner` | Evaluates graph variants over adapted datasets |
+| `evals` | Scores traces with strict metrics |
+
+---
+
+## Graph execution model
+
+The executor is edge-driven.
+
+Each role writes one canonical output slot:
+
+| Role | Output slot |
+|---|---|
+| perceive | perception |
+| reason | reasoning |
+| grounding | grounding |
+| readiness | readiness |
+| plan | plan |
+| act | action |
+| learn | learning |
+
+Each node receives a `NodeInput` containing only the upstream slots allowed by `ROLE_INPUTS`.
+
+This makes graph wiring testable. A node cannot silently consume arbitrary context unless the graph declares that dependency.
+
+---
+
+## Current graph variants
+
+The turn-level evaluator compares five graph configurations:
+
+| Graph | Shape / mode |
+|---|---|
+| monolithic | `plan → act` |
+| minimal | `perceive → plan → act` |
+| recommended_stub | full recommended graph with stub grounding |
+| recommended_deterministic | full recommended graph with deterministic grounding |
+| recommended_oracle | full recommended graph with oracle grounding |
+
+The current evidence shows that the full graph only becomes useful when the grounding node is capable.
+
+---
+
+## Running the full pipeline
+
+From repo root:
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
+python scripts/convert_traces.py \
+  --input data/raw/simulations/baseline_retail_100/results.json \
+  --out-dir data/out
+```
 
-# 1. Convert tau-style simulation traces into cognitive dataset artifacts
-python scripts/convert_traces.py --input data/raw/results.json --out-dir data/out/
+```bash
+python scripts/build_reports.py \
+  --out-dir data/out \
+  --reports-dir reports \
+  --source baseline_retail_100
+```
 
-# 2. Build cognitive topology reports
-python scripts/build_reports.py --input data/out/ --out-dir data/out/
-
-# 3. Recommend a cognitive graph from the report
+```bash
 python scripts/recommend_graph.py \
-  --report data/out/cognitive_dataset_report.json \
+  --report reports/cognitive_dataset_report.json \
   --out reports/recommended_graph.json
-
-# 4. Evaluate graphs against each other (monolithic / minimal / stub / oracle)
-python scripts/run_graph_evaluation.py \
-  --recommended reports/recommended_graph.json \
-  --report      reports/cognitive_dataset_report.json \
-  --out-dir     data/out --reports-dir reports
-
-# Other entry points
-python scripts/run_baseline.py --dataset data/dev/tool_calling_micro.jsonl
-python scripts/run_lab.py      --dataset data/dev/tool_calling_micro.jsonl
-python scripts/evaluate_trace.py
-
-pytest
 ```
 
-Requires Python >= 3.11. Runtime dependencies: `pydantic>=2.0`, `rich>=13.0`.
-
-> **Note:** the converter reads tau-bench-style traces you supply at
-> `data/raw/results.json` (not committed). Small ready-to-run datasets ship under
-> `data/dev/` and `data/test/` for the baseline and lab scripts.
-
----
-
-## 10. Repository Structure
-
+```bash
+python scripts/run_turn_graph_evaluation.py
 ```
-src/cognitive_tool_agent/
-  schemas/            Pydantic contracts for every stage, artifact, and graph
-  trace_converter/    Deterministic tau-style trace -> cognitive artifacts
-  reports/            Cognitive topology report builders
-  recommender/        Signal extraction, capability inference, graph recommendation,
-                      and the revision advisor
-  agents/             Cognitive stage agents (perceive ... learn); stub today,
-                      model_adapter seam for future LLM backends
-  graph/              GraphExecutor + RunContext (node-driven execution)
-  graph_runner/       Multi-graph evaluation harness + trace writer
-  graph_builder/      Lab loop (profiler, candidate generator, optimizer)
-  evals/              Metrics and evaluator
-  tools/              Tool registry + fake tools for offline runs
-  datasets/           JSONL dataset loader
 
-data/   raw/ (your input traces), out/ (artifacts+reports), dev/, test/
-scripts/  CLI entry points          tests/  pytest suite
+Optional limited run:
+
+```bash
+python scripts/run_turn_graph_evaluation.py --limit 20
+```
+
+Explain one row:
+
+```bash
+python scripts/explain_turn_graph_row.py \
+  --row-index 0 \
+  --graph recommended_deterministic
+```
+
+Other graph options:
+
+```text
+monolithic
+minimal
+recommended_stub
+recommended_deterministic
+recommended_oracle
 ```
 
 ---
 
-## 11. Evaluation Metrics
+## Legacy action-sequence evaluation
 
-| Metric                  | Stage     | Description                             |
-| ----------------------- | --------- | --------------------------------------- |
-| `end_to_end_success`    | -         | Final action matches expected           |
-| `tool_name_accuracy`    | plan      | Correct tool selected                   |
-| `argument_exact_match`  | act       | Arguments exactly match expected        |
-| `policy_violation_rate` | readiness | Fraction of rows with policy violations |
-| `stage_failure_rate`    | -         | Fraction with any stage failure         |
+There is also an action-sequence graph evaluation path:
+
+```bash
+python scripts/run_graph_evaluation.py
+```
+
+This path evaluates:
+
+```text
+first user message → selected primary action
+```
+
+It is useful as a stress test, but it is currently too misaligned for the stub/deterministic graph and tends to produce all-zero results.
+
+The turn-level evaluator is the current primary evaluation path.
 
 ---
 
-## 12. Design Principle
+## Development workflow
 
-> **No optimization before measurement.**
+Recommended workflow:
 
-Datasets are treated as behavior-space specifications, not example collections.
-Metrics are selection pressure. Graph search is driven by measured failures, not
-prompt intuition. Every change - including every LLM node - must beat the stub it
-replaces on a metric you can see.
+```text
+1. Convert traces
+2. Build cognitive reports
+3. Recommend graph
+4. Run turn-level graph evaluation
+5. Inspect field-level failures
+6. Add deterministic or model-backed capability
+7. Reevaluate
+```
 
-### Long-term goal
+Do not optimize prompts before the dataset, metrics, and baseline are stable.
 
-A measurable cognitive operating system for production agents: datasets reveal
-required capabilities, reports expose cognitive topology, graph recommendations
-are evidence-based, each node has explicit typed contracts, failures map to
-specific stages, and optimizers search over a measurable behavior space.
+---
+
+## Tests
+
+The repo includes tests for:
+
+```text
+schema validation
+trace conversion
+dataset profiling
+graph execution
+edge-driven wiring
+graph recommender
+turn-level adapter
+deterministic grounding
+graph evaluation
+revision advice
+```
+
+Current milestone acceptance criteria:
+
+```text
+all existing tests pass
+turn-level graph evaluation emits five graph rows
+recommended_deterministic beats recommended_stub
+field-level grounding report is produced
+deterministic grounding does not use expected arguments
+```
+
+---
+
+## Current limitations
+
+The current result is strong but scoped.
+
+Known limitations:
+
+```text
+- deterministic grounding is Pass 1 only
+- item_ids and new_item_ids are unresolved
+- product_id grounding is over-eager and often wrong
+- order_id grounding needs safer disambiguation
+- graph evaluation is turn-level, not full tau2 interactive replay
+- no LLM-backed node is implemented yet
+- no DSPy optimization loop yet
+```
+
+---
+
+## Next milestones
+
+### Milestone 2.1 — Stabilize scalar grounding
+
+Improve fields already attempted:
+
+```text
+order_id
+product_id
+payment_method_id
+```
+
+Targets:
+
+```text
+order_id exact match > 33%
+product_id exact match > 28%
+deterministic E2E >= 39%
+wrong-resolution rate decreases
+```
+
+Focus:
+
+```text
+prefer unresolved over wrong
+handle multiple candidate IDs conservatively
+use immediate/local context before broad history
+```
+
+### Milestone 3 — Item-list grounding
+
+Add a dedicated item grounding capability:
+
+```text
+item_ids
+new_item_ids
+```
+
+This requires resolving user references against order details and product details.
+
+Expected inputs:
+
+```text
+user message
+prior order details
+prior product details
+item names
+colors/sizes
+quantities
+replacement intent
+```
+
+### Milestone 4 — LLM grounding
+
+Only after deterministic baselines and oracle gaps are clear:
+
+```text
+stub → deterministic → llm → oracle
+```
+
+The goal is not to replace measurement with an LLM. The goal is to test whether an LLM can close more of the already-measured grounding gap.
+
+### Milestone 5 — Full trajectory evaluation
+
+Eventually, evaluate full tau2-style interactive trajectories instead of local turn-level rows.
+
+This should come after the turn-level cognitive spaces are measurable and optimized.
+
+---
+
+## Research claim so far
+
+The current honest claim:
+
+```text
+On 547 tau2 retail turn-level tool-call decisions, the system exposes a large grounding bottleneck.
+A full cognitive graph with stub grounding reaches 2% E2E success.
+The same graph with deterministic grounding reaches 39%.
+The same graph with oracle grounding reaches 100%.
+
+This shows that the dataset contains measurable grounding pressure,
+that the graph can consume improved grounding,
+and that deterministic non-label logic can close part of the oracle gap.
+```
+
+That is the first real proof of the repo’s direction.
+
+---
+
+## Design philosophy
+
+This project follows evaluation-driven development:
+
+```text
+dataset → metrics → baseline → failure analysis → capability isolation → optimization → reevaluation
+```
+
+Prompts are not the source of truth.
+
+The source of truth is:
+
+```text
+dataset + metrics + controlled comparisons
+```
+
+A graph is not believed because it looks elegant.  
+It earns its place only if it moves the right metric on the right behavior slice.
