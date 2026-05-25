@@ -231,6 +231,30 @@ def test_graph_recommender_minimal_graph():
     assert rec.readiness_required is False
 
 
+def test_graph_recommender_full_graph_has_dag_edges():
+    inference = _make_inference(memory=True, grounding=True, readiness=True, deep_planning=True)
+    rec = GraphRecommender().run(inference)
+    edge_pairs = {(e.from_node, e.to_node) for e in rec.graph_spec.edges}
+
+    assert ("reason", "plan") in edge_pairs, "reason→plan edge missing"
+    assert ("grounding", "plan") in edge_pairs, "grounding→plan edge missing"
+    assert ("grounding", "readiness") in edge_pairs, "grounding→readiness edge missing"
+    assert ("reason", "readiness") in edge_pairs, "reason→readiness edge missing"
+    assert ("readiness", "plan") in edge_pairs, "readiness→plan edge missing"
+
+    grounding_to_plan = next(
+        e for e in rec.graph_spec.edges
+        if e.from_node == "grounding" and e.to_node == "plan"
+    )
+    assert grounding_to_plan.provides == "grounding"
+
+    reason_to_plan = next(
+        e for e in rec.graph_spec.edges
+        if e.from_node == "reason" and e.to_node == "plan"
+    )
+    assert reason_to_plan.provides == "reasoning"
+
+
 def test_recommended_graph_is_valid_graphspec():
     engine = CapabilityInferenceEngine()
     inference = engine.run(_high_signal_report())

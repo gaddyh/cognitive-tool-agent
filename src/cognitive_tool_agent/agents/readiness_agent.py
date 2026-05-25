@@ -51,7 +51,15 @@ class ReadinessAgent:
                 confidence=Confidence(score=0.0, reason="tool not registered"),
             )
 
+        grounded_fields = {
+            key
+            for key, value in ctx.grounding.resolved_args.items()
+            if value is not None
+        } if ctx.grounding else set()
+
         for req in reasoning.missing_requirements:
+            if req.field_name in grounded_fields:
+                continue
             if not req.can_infer:
                 missing_required_fields.append(req.field_name)
                 blocking_reasons.append(f"required field '{req.field_name}' is missing")

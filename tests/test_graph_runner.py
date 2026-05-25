@@ -316,6 +316,210 @@ def test_grounding_agent_oracle_uses_expected_args():
     assert result.grounding_confidence == 1.0
 
 
+# ── PlanAgent grounding unit test ────────────────────────────────────────────
+
+def test_plan_agent_uses_grounding_resolved_args():
+    from cognitive_tool_agent.agents.plan_agent import PlanAgent
+    from cognitive_tool_agent.graph.node_input import NodeInput
+    from cognitive_tool_agent.schemas.common import Confidence, UserInput
+    from cognitive_tool_agent.schemas.dataset import DatasetRow, ExpectedBehavior
+    from cognitive_tool_agent.schemas.grounding import GroundingResult
+    from cognitive_tool_agent.schemas.reason import ReasoningResult
+    from cognitive_tool_agent.schemas.readiness import ReadinessResult
+    from cognitive_tool_agent.tools.fake_tools import DEFAULT_REGISTRY
+
+    agent = PlanAgent(mode="stub")
+    user_input = UserInput(
+        message="check order status",
+        available_tools=[DEFAULT_REGISTRY.lookup("get_order_status")],
+    )
+    row = DatasetRow(
+        id="p1",
+        user_message="check order status",
+        expected=ExpectedBehavior(expected_action="tool_executed", expected_tool="get_order_status"),
+    )
+    reasoning = ReasoningResult(
+        selected_intent="use_get_order_status",
+        selected_tool="get_order_status",
+        reasoning_status="ready",
+        confidence=Confidence(score=0.8, reason="test"),
+    )
+    readiness = ReadinessResult(
+        ready=True,
+        confidence=Confidence(score=0.9, reason="test"),
+    )
+    grounding = GroundingResult(
+        grounding_mode="oracle",
+        resolved_args={"order_id": "#W999"},
+        grounding_confidence=1.0,
+    )
+    ctx = NodeInput(
+        user_input=user_input,
+        registry=DEFAULT_REGISTRY,
+        row=row,
+        reasoning=reasoning,
+        readiness=readiness,
+        grounding=grounding,
+    )
+    result = agent.run(ctx)
+    assert result.next_action == "execute_tool"
+    assert result.tool_call is not None
+    assert result.tool_call.arguments["order_id"] == "#W999"
+
+
+# ── ReadinessAgent grounding unit test ───────────────────────────────────────
+
+def test_readiness_agent_grounded_field_not_blocking():
+    from cognitive_tool_agent.agents.readiness_agent import ReadinessAgent
+    from cognitive_tool_agent.graph.node_input import NodeInput
+    from cognitive_tool_agent.schemas.common import Confidence, UserInput
+    from cognitive_tool_agent.schemas.dataset import DatasetRow, ExpectedBehavior
+    from cognitive_tool_agent.schemas.grounding import GroundingResult
+    from cognitive_tool_agent.schemas.reason import MissingRequirement, ReasoningResult
+    from cognitive_tool_agent.tools.fake_tools import DEFAULT_REGISTRY
+
+    agent = ReadinessAgent(mode="stub")
+    user_input = UserInput(
+        message="check order status",
+        available_tools=[DEFAULT_REGISTRY.lookup("get_order_status")],
+    )
+    row = DatasetRow(
+        id="r1",
+        user_message="check order status",
+        expected=ExpectedBehavior(expected_action="tool_executed", expected_tool="get_order_status"),
+    )
+    reasoning = ReasoningResult(
+        selected_intent="use_get_order_status",
+        selected_tool="get_order_status",
+        missing_requirements=[
+            MissingRequirement(field_name="order_id", reason="not in message", can_infer=False)
+        ],
+        reasoning_status="needs_clarification",
+        confidence=Confidence(score=0.4, reason="test"),
+    )
+    grounding = GroundingResult(
+        grounding_mode="oracle",
+        resolved_args={"order_id": "#W999"},
+        grounding_confidence=1.0,
+    )
+    ctx = NodeInput(
+        user_input=user_input,
+        registry=DEFAULT_REGISTRY,
+        row=row,
+        reasoning=reasoning,
+        grounding=grounding,
+    )
+    result = agent.run(ctx)
+    assert result.ready is True
+    assert "order_id" not in result.missing_required_fields
+
+
+# ── Oracle ≥ stub integration test ───────────────────────────────────────────
+
+def _make_grounding_dag_graph() -> "GraphSpec":
+    from cognitive_tool_agent.schemas.graph_spec import EdgeSpec, GraphSpec, NodeSpec
+    return GraphSpec(
+        id="test_grounding_dag",
+        nodes=[
+            NodeSpec(id="perceive", role="perceive"),
+            NodeSpec(id="reason", role="reason"),
+            NodeSpec(id="grounding", role="grounding"),
+            NodeSpec(id="readiness", role="readiness"),
+            NodeSpec(id="plan", role="plan"),
+            NodeSpec(id="act", role="act"),
+        ],
+        edges=[
+            EdgeSpec(from_node="perceive", to_node="reason", provides="perception"),
+            EdgeSpec(from_node="reason", to_node="grounding", provides="reasoning"),
+            EdgeSpec(from_node="reason", to_node="readiness", provides="reasoning"),
+            EdgeSpec(from_node="grounding", to_node="readiness", provides="grounding"),
+            EdgeSpec(from_node="reason", to_node="plan", provides="reasoning"),
+            EdgeSpec(from_node="grounding", to_node="plan", provides="grounding"),
+            EdgeSpec(from_node="readiness", to_node="plan", provides="readiness"),
+            EdgeSpec(from_node="plan", to_node="act", provides="plan"),
+        ],
+    )
+
+
+def _make_groundable_row() -> "DatasetRow":
+    from cognitive_tool_agent.schemas.dataset import DatasetRow, ExpectedBehavior
+    return DatasetRow(
+        id="groundable-1",
+        user_message="check status of order #W001",
+        tools=["get_order_status"],
+        expected=ExpectedBehavior(
+            expected_action="tool_executed",
+            expected_tool="get_order_status",
+            expected_arguments={"order_id": "#W999"},
+        ),
+    )
+
+
+def test_oracle_grounding_not_below_stub_argument_match():
+    from cognitive_tool_agent.evals.evaluator import Evaluator
+    from cognitive_tool_agent.graph.cognitive_graph import GraphExecutor
+    from cognitive_tool_agent.schemas.experiment import ExperimentSpec, NodeRuntimeConfig
+    from cognitive_tool_agent.tools.fake_tools import DEFAULT_REGISTRY
+
+    graph = _make_grounding_dag_graph()
+    row = _make_groundable_row()
+
+    stub_exp = ExperimentSpec(
+        graph=graph,
+        runtime=[NodeRuntimeConfig(node_id="grounding", mode="stub")],
+    )
+    oracle_exp = ExperimentSpec(
+        graph=graph,
+        runtime=[NodeRuntimeConfig(node_id="grounding", mode="oracle")],
+    )
+
+    executor = GraphExecutor()
+    evaluator = Evaluator()
+
+    stub_traces = [executor.run(stub_exp, row, DEFAULT_REGISTRY)]
+    oracle_traces = [executor.run(oracle_exp, row, DEFAULT_REGISTRY)]
+
+    stub_score = evaluator.score(stub_traces, [row])["argument_exact_match"]
+    oracle_score = evaluator.score(oracle_traces, [row])["argument_exact_match"]
+
+    assert oracle_score >= stub_score, (
+        f"oracle argument_exact_match ({oracle_score}) must be >= stub ({stub_score})"
+    )
+
+
+def test_oracle_grounding_improves_argument_match_on_groundable_row():
+    from cognitive_tool_agent.evals.evaluator import Evaluator
+    from cognitive_tool_agent.graph.cognitive_graph import GraphExecutor
+    from cognitive_tool_agent.schemas.experiment import ExperimentSpec, NodeRuntimeConfig
+    from cognitive_tool_agent.tools.fake_tools import DEFAULT_REGISTRY
+
+    graph = _make_grounding_dag_graph()
+    row = _make_groundable_row()
+
+    stub_exp = ExperimentSpec(
+        graph=graph,
+        runtime=[NodeRuntimeConfig(node_id="grounding", mode="stub")],
+    )
+    oracle_exp = ExperimentSpec(
+        graph=graph,
+        runtime=[NodeRuntimeConfig(node_id="grounding", mode="oracle")],
+    )
+
+    executor = GraphExecutor()
+    evaluator = Evaluator()
+
+    stub_traces = [executor.run(stub_exp, row, DEFAULT_REGISTRY)]
+    oracle_traces = [executor.run(oracle_exp, row, DEFAULT_REGISTRY)]
+
+    stub_score = evaluator.score(stub_traces, [row])["argument_exact_match"]
+    oracle_score = evaluator.score(oracle_traces, [row])["argument_exact_match"]
+
+    assert oracle_score > stub_score, (
+        f"oracle argument_exact_match ({oracle_score}) must strictly exceed stub ({stub_score}) "
+        f"on a controlled row where reasoning finds the wrong ID but oracle supplies the correct one"
+    )
+
+
 def test_grounding_agent_disabled_returns_empty():
     from cognitive_tool_agent.agents.grounding_agent import GroundingAgent
     from cognitive_tool_agent.graph.node_input import NodeInput

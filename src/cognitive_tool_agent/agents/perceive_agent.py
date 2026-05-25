@@ -36,6 +36,12 @@ class PerceiveAgent:
                 candidate_tools.append(tool_name)
                 intent_candidates.append(f"use_{tool_name}")
 
+        if not candidate_tools:
+            primary_tool = user_input.world_state.get("primary_tool")
+            if primary_tool and primary_tool in tool_names:
+                candidate_tools.append(primary_tool)
+                intent_candidates.append(f"use_{primary_tool}")
+
         if not intent_candidates:
             intent_candidates = ["unknown_intent"]
 

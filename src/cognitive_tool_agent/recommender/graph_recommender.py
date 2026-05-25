@@ -39,10 +39,37 @@ class GraphRecommender:
             node_ids.append("learn")
 
         nodes = [NodeSpec(id=nid, role=nid) for nid in node_ids]  # type: ignore[arg-type]
-        edges = [
-            EdgeSpec(from_node=node_ids[i], to_node=node_ids[i + 1])
-            for i in range(len(node_ids) - 1)
-        ]
+
+        node_set = set(node_ids)
+        edges: list[EdgeSpec] = []
+
+        if "reason" in node_set:
+            edges.append(EdgeSpec(from_node="perceive", to_node="reason", provides="perception"))
+        else:
+            edges.append(EdgeSpec(from_node="perceive", to_node="plan"))
+
+        if "reason" in node_set and "grounding" in node_set:
+            edges.append(EdgeSpec(from_node="reason", to_node="grounding", provides="reasoning"))
+
+        if "reason" in node_set and "readiness" in node_set:
+            edges.append(EdgeSpec(from_node="reason", to_node="readiness", provides="reasoning"))
+
+        if "grounding" in node_set and "readiness" in node_set:
+            edges.append(EdgeSpec(from_node="grounding", to_node="readiness", provides="grounding"))
+
+        if "reason" in node_set:
+            edges.append(EdgeSpec(from_node="reason", to_node="plan", provides="reasoning"))
+
+        if "grounding" in node_set:
+            edges.append(EdgeSpec(from_node="grounding", to_node="plan", provides="grounding"))
+
+        if "readiness" in node_set:
+            edges.append(EdgeSpec(from_node="readiness", to_node="plan", provides="readiness"))
+
+        edges.append(EdgeSpec(from_node="plan", to_node="act", provides="plan"))
+
+        if "learn" in node_set:
+            edges.append(EdgeSpec(from_node="act", to_node="learn"))
 
         graph_id = "recommended_" + "_".join(
             cap for cap, req in [

@@ -5,6 +5,7 @@ from typing import Any
 from ..adapters.base import AgentMode, ModelAdapter
 from ..graph.node_input import NodeInput
 from ..schemas.common import Confidence, UserInput
+from ..schemas.grounding import GroundingResult
 from ..schemas.reason import ReasoningResult
 from ..schemas.readiness import ReadinessResult
 from ..schemas.plan import PlanResult, ToolCallPlan
@@ -61,7 +62,7 @@ class PlanAgent:
                 confidence=Confidence(score=0.7, reason="reasoning needs clarification"),
             )
 
-        tool_call = _build_tool_call(selected_tool, reasoning, user_input)
+        tool_call = _build_tool_call(selected_tool, reasoning, user_input, ctx.grounding)
         return PlanResult(
             next_action="execute_tool",
             tool_call=tool_call,
@@ -126,11 +127,17 @@ def _build_tool_call(
     tool_name: str,
     reasoning: ReasoningResult,
     user_input: UserInput,
+    grounding: GroundingResult | None = None,
 ) -> ToolCallPlan:
     args: dict[str, Any] = {}
 
+    if grounding is not None:
+        for key, value in grounding.resolved_args.items():
+            if value is not None:
+                args[key] = value
+
     for entity in reasoning.resolved_entities:
-        if entity.entity_type == "order_id":
+        if entity.entity_type == "order_id" and entity.resolved_value and "order_id" not in args:
             args["order_id"] = entity.resolved_value
 
     tool_schema = next(

@@ -44,9 +44,9 @@ ROLE_OUTPUT: dict[str, str] = {
 ROLE_INPUTS: dict[str, dict[str, str]] = {
     "perceive":  {},
     "reason":    {"perception": "optional"},
-    "readiness": {"reasoning":  "optional"},
     "grounding": {"reasoning":  "optional"},
-    "plan":      {"reasoning":  "optional", "readiness": "optional"},
+    "readiness": {"reasoning":  "optional", "grounding": "optional"},
+    "plan":      {"reasoning":  "optional", "readiness": "optional", "grounding": "optional"},
     "act":       {"plan":       "required"},
     "learn":     {},
 }
