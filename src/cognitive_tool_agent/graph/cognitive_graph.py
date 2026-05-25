@@ -6,6 +6,7 @@ from typing import Any
 from ..schemas.common import UserInput
 from ..schemas.dataset import DatasetRow
 from ..schemas.graph_spec import EdgeSpec, GraphSpec, NodeSpec, NodeRole  # noqa: F401
+from ..schemas.grounding import GroundingResult
 from ..schemas.perceive import PerceptionResult
 from ..schemas.reason import ReasoningResult
 from ..schemas.readiness import ReadinessResult
@@ -22,6 +23,7 @@ class RunContext:
     registry: ToolRegistry
     perception: PerceptionResult | None = None
     reasoning: ReasoningResult | None = None
+    grounding: GroundingResult | None = None
     readiness: ReadinessResult | None = None
     plan: PlanResult | None = None
     action: ActionResult | None = None
@@ -33,6 +35,7 @@ class RunContext:
             input=user_input,
             perception=self.perception,
             reasoning=self.reasoning,
+            grounding=self.grounding,
             readiness=self.readiness,
             plan=self.plan,
             action=self.action,
@@ -61,9 +64,10 @@ class GraphExecutor:
     stages are hardcoded; the graph definition fully controls execution.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, grounding_mode: str = "stub") -> None:
         from ..agents.perceive_agent import PerceiveAgent
         from ..agents.reason_agent import ReasonAgent
+        from ..agents.grounding_agent import GroundingAgent
         from ..agents.readiness_agent import ReadinessAgent
         from ..agents.plan_agent import PlanAgent
         from ..agents.act_agent import ActAgent
@@ -71,6 +75,7 @@ class GraphExecutor:
 
         self._perceive = PerceiveAgent()
         self._reason = ReasonAgent()
+        self._grounding = GroundingAgent(grounding_mode=grounding_mode)  # type: ignore[arg-type]
         self._readiness = ReadinessAgent()
         self._plan = PlanAgent()
         self._act = ActAgent()
@@ -110,9 +115,14 @@ class GraphExecutor:
         elif role == "monolithic":
             ctx.plan, ctx.action = _run_monolithic(user_input, ctx.registry)
 
-        elif role in ("grounding", "memory"):
+        elif role == "grounding":
+            ctx.grounding = self._grounding.run(user_input, ctx.reasoning, ctx.row)
+
+        elif role == "memory":
             raise NotImplementedError(
-                f"Node role {role!r} is recommender-only in v1 and has no executor implementation yet."
+                "Node role 'memory' is recommender-only in v1. "
+                "GraphRecommender maps memory capability to 'learn' node, not 'memory'. "
+                "If you see this error, a graph was hand-crafted with a 'memory' node."
             )
 
         else:

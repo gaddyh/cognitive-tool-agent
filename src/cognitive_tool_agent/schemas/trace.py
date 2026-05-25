@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from .common import UserInput
+from .grounding import GroundingResult
 from .perceive import PerceptionResult
 from .reason import ReasoningResult
 from .readiness import ReadinessResult
@@ -13,6 +14,7 @@ class CognitiveTrace(BaseModel):
 
     perception: PerceptionResult | None = None
     reasoning: ReasoningResult | None = None
+    grounding: GroundingResult | None = None
     readiness: ReadinessResult | None = None
     plan: PlanResult | None = None
     action: ActionResult | None = None
