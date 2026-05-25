@@ -1,0 +1,9 @@
+{
+  "tasks_count": 100,
+  "simulations_count": 100,
+  "messages_count": 2714,
+  "expected_actions_count": 514,
+  "actual_tool_calls_count": 797,
+  "matched_actions_count": 427,
+  "failed_actions_count": 60
+}

@@ -1,0 +1,668 @@
+{
+  "generated_at": "2026-05-25 00:41 UTC",
+  "source": "data/out",
+  "dataset_summary": {
+    "tasks_count": 100,
+    "simulations_count": 100,
+    "messages_count": 2714,
+    "expected_actions_count": 514,
+    "actual_tool_calls_count": 797,
+    "matched_actions_count": 427,
+    "failed_actions_count": 60,
+    "tool_entropy_bits": 3.063,
+    "avg_tools_per_simulation": 7.97,
+    "avg_turns_before_write_action": 21.1,
+    "read_tool_calls": 626,
+    "write_tool_calls": 151,
+    "read_write_ratio": 4.15
+  },
+  "cognitive_action_topology": [
+    {
+      "tool_name": "find_user_id_by_name_zip",
+      "tool_type": "read",
+      "required_args_count": 3,
+      "usage_count": 85,
+      "avg_turn_distance": 1.0,
+      "avg_chain_depth": 0.1,
+      "grounding_fraction": 0.017,
+      "extraction_burden": "high",
+      "memory_burden": "low",
+      "readiness_burden": "low",
+      "reasoning_burden": "low",
+      "grounding_burden": "low",
+      "complexity_score": 3
+    },
+    {
+      "tool_name": "get_order_details",
+      "tool_type": "read",
+      "required_args_count": 1,
+      "usage_count": 285,
+      "avg_turn_distance": 10.9,
+      "avg_chain_depth": 3.4,
+      "grounding_fraction": 1.0,
+      "extraction_burden": "low",
+      "memory_burden": "very_high",
+      "readiness_burden": "low",
+      "reasoning_burden": "high",
+      "grounding_burden": "very_high",
+      "complexity_score": 8
+    },
+    {
+      "tool_name": "get_product_details",
+      "tool_type": "read",
+      "required_args_count": 1,
+      "usage_count": 98,
+      "avg_turn_distance": 15.7,
+      "avg_chain_depth": 4.0,
+      "grounding_fraction": 1.0,
+      "extraction_burden": "low",
+      "memory_burden": "very_high",
+      "readiness_burden": "low",
+      "reasoning_burden": "high",
+      "grounding_burden": "very_high",
+      "complexity_score": 8
+    },
+    {
+      "tool_name": "exchange_delivered_order_items",
+      "tool_type": "write",
+      "required_args_count": 4,
+      "usage_count": 32,
+      "avg_turn_distance": 20.8,
+      "avg_chain_depth": 2.9,
+      "grounding_fraction": 0.982,
+      "extraction_burden": "very_high",
+      "memory_burden": "very_high",
+      "readiness_burden": "high",
+      "reasoning_burden": "medium",
+      "grounding_burden": "very_high",
+      "complexity_score": 17
+    },
+    {
+      "tool_name": "get_user_details",
+      "tool_type": "read",
+      "required_args_count": 1,
+      "usage_count": 101,
+      "avg_turn_distance": 7.5,
+      "avg_chain_depth": 1.2,
+      "grounding_fraction": 1.0,
+      "extraction_burden": "low",
+      "memory_burden": "very_high",
+      "readiness_burden": "low",
+      "reasoning_burden": "medium",
+      "grounding_burden": "very_high",
+      "complexity_score": 6
+    },
+    {
+      "tool_name": "return_delivered_order_items",
+      "tool_type": "write",
+      "required_args_count": 3,
+      "usage_count": 36,
+      "avg_turn_distance": 12.4,
+      "avg_chain_depth": 5.0,
+      "grounding_fraction": 0.828,
+      "extraction_burden": "high",
+      "memory_burden": "very_high",
+      "readiness_burden": "high",
+      "reasoning_burden": "high",
+      "grounding_burden": "very_high",
+      "complexity_score": 14
+    },
+    {
+      "tool_name": "modify_pending_order_items",
+      "tool_type": "write",
+      "required_args_count": 4,
+      "usage_count": 35,
+      "avg_turn_distance": 24.1,
+      "avg_chain_depth": 4.1,
+      "grounding_fraction": 1.0,
+      "extraction_burden": "very_high",
+      "memory_burden": "very_high",
+      "readiness_burden": "high",
+      "reasoning_burden": "high",
+      "grounding_burden": "very_high",
+      "complexity_score": 17
+    },
+    {
+      "tool_name": "find_user_id_by_email",
+      "tool_type": "read",
+      "required_args_count": 1,
+      "usage_count": 25,
+      "avg_turn_distance": 1.4,
+      "avg_chain_depth": 0.2,
+      "grounding_fraction": 0.143,
+      "extraction_burden": "low",
+      "memory_burden": "low",
+      "readiness_burden": "low",
+      "reasoning_burden": "low",
+      "grounding_burden": "low",
+      "complexity_score": 1
+    },
+    {
+      "tool_name": "transfer_to_human_agents",
+      "tool_type": "generic",
+      "required_args_count": 1,
+      "usage_count": 5,
+      "avg_turn_distance": 18.0,
+      "avg_chain_depth": 4.0,
+      "grounding_fraction": 1.0,
+      "extraction_burden": "low",
+      "memory_burden": "very_high",
+      "readiness_burden": "low",
+      "reasoning_burden": "high",
+      "grounding_burden": "very_high",
+      "complexity_score": 8
+    },
+    {
+      "tool_name": "calculate",
+      "tool_type": "generic",
+      "required_args_count": 1,
+      "usage_count": 8,
+      "avg_turn_distance": 29.7,
+      "avg_chain_depth": 4.7,
+      "grounding_fraction": 1.0,
+      "extraction_burden": "low",
+      "memory_burden": "very_high",
+      "readiness_burden": "low",
+      "reasoning_burden": "high",
+      "grounding_burden": "very_high",
+      "complexity_score": 8
+    },
+    {
+      "tool_name": "cancel_pending_order",
+      "tool_type": "write",
+      "required_args_count": 2,
+      "usage_count": 26,
+      "avg_turn_distance": 11.7,
+      "avg_chain_depth": 4.2,
+      "grounding_fraction": 0.674,
+      "extraction_burden": "medium",
+      "memory_burden": "very_high",
+      "readiness_burden": "high",
+      "reasoning_burden": "high",
+      "grounding_burden": "high",
+      "complexity_score": 12
+    },
+    {
+      "tool_name": "modify_pending_order_address",
+      "tool_type": "write",
+      "required_args_count": 7,
+      "usage_count": 12,
+      "avg_turn_distance": 11.9,
+      "avg_chain_depth": 2.4,
+      "grounding_fraction": 0.738,
+      "extraction_burden": "very_high",
+      "memory_burden": "very_high",
+      "readiness_burden": "high",
+      "reasoning_burden": "medium",
+      "grounding_burden": "high",
+      "complexity_score": 20
+    },
+    {
+      "tool_name": "get_item_details",
+      "tool_type": "read",
+      "required_args_count": 1,
+      "usage_count": 32,
+      "avg_turn_distance": 4.0,
+      "avg_chain_depth": 5.5,
+      "grounding_fraction": 0.0,
+      "extraction_burden": "low",
+      "memory_burden": "medium",
+      "readiness_burden": "low",
+      "reasoning_burden": "very_high",
+      "grounding_burden": "low",
+      "complexity_score": 5
+    },
+    {
+      "tool_name": "modify_user_address",
+      "tool_type": "write",
+      "required_args_count": 7,
+      "usage_count": 9,
+      "avg_turn_distance": 9.9,
+      "avg_chain_depth": 3.9,
+      "grounding_fraction": 0.696,
+      "extraction_burden": "very_high",
+      "memory_burden": "very_high",
+      "readiness_burden": "high",
+      "reasoning_burden": "high",
+      "grounding_burden": "high",
+      "complexity_score": 21
+    },
+    {
+      "tool_name": "modify_pending_order_payment",
+      "tool_type": "write",
+      "required_args_count": 2,
+      "usage_count": 1,
+      "avg_turn_distance": 12.0,
+      "avg_chain_depth": 3.0,
+      "grounding_fraction": 1.0,
+      "extraction_burden": "medium",
+      "memory_burden": "very_high",
+      "readiness_burden": "high",
+      "reasoning_burden": "medium",
+      "grounding_burden": "very_high",
+      "complexity_score": 13
+    },
+    {
+      "tool_name": "list_all_product_types",
+      "tool_type": "unknown",
+      "required_args_count": 0,
+      "usage_count": 7,
+      "avg_turn_distance": 0.0,
+      "avg_chain_depth": 0.0,
+      "grounding_fraction": 0.0,
+      "extraction_burden": "low",
+      "memory_burden": "low",
+      "readiness_burden": "low",
+      "reasoning_burden": "low",
+      "grounding_burden": "low",
+      "complexity_score": 0
+    }
+  ],
+  "argument_emergence": [
+    {
+      "arg_name": "address1",
+      "total_instances": 20,
+      "appears_explicitly": 5,
+      "appears_explicitly_pct": 25.0,
+      "requires_tool_chaining": 12,
+      "requires_tool_chaining_pct": 60.0,
+      "requires_grounding": 2,
+      "requires_grounding_pct": 10.0,
+      "requires_inference": 1,
+      "requires_inference_pct": 5.0
+    },
+    {
+      "arg_name": "address2",
+      "total_instances": 20,
+      "appears_explicitly": 6,
+      "appears_explicitly_pct": 30.0,
+      "requires_tool_chaining": 12,
+      "requires_tool_chaining_pct": 60.0,
+      "requires_grounding": 2,
+      "requires_grounding_pct": 10.0,
+      "requires_inference": 0,
+      "requires_inference_pct": 0.0
+    },
+    {
+      "arg_name": "city",
+      "total_instances": 20,
+      "appears_explicitly": 6,
+      "appears_explicitly_pct": 30.0,
+      "requires_tool_chaining": 13,
+      "requires_tool_chaining_pct": 65.0,
+      "requires_grounding": 1,
+      "requires_grounding_pct": 5.0,
+      "requires_inference": 0,
+      "requires_inference_pct": 0.0
+    },
+    {
+      "arg_name": "country",
+      "total_instances": 20,
+      "appears_explicitly": 6,
+      "appears_explicitly_pct": 30.0,
+      "requires_tool_chaining": 14,
+      "requires_tool_chaining_pct": 70.0,
+      "requires_grounding": 0,
+      "requires_grounding_pct": 0.0,
+      "requires_inference": 0,
+      "requires_inference_pct": 0.0
+    },
+    {
+      "arg_name": "email",
+      "total_instances": 14,
+      "appears_explicitly": 12,
+      "appears_explicitly_pct": 85.7,
+      "requires_tool_chaining": 0,
+      "requires_tool_chaining_pct": 0.0,
+      "requires_grounding": 2,
+      "requires_grounding_pct": 14.3,
+      "requires_inference": 0,
+      "requires_inference_pct": 0.0
+    },
+    {
+      "arg_name": "expression",
+      "total_instances": 3,
+      "appears_explicitly": 0,
+      "appears_explicitly_pct": 0.0,
+      "requires_tool_chaining": 0,
+      "requires_tool_chaining_pct": 0.0,
+      "requires_grounding": 0,
+      "requires_grounding_pct": 0.0,
+      "requires_inference": 3,
+      "requires_inference_pct": 100.0
+    },
+    {
+      "arg_name": "first_name",
+      "total_instances": 60,
+      "appears_explicitly": 60,
+      "appears_explicitly_pct": 100.0,
+      "requires_tool_chaining": 0,
+      "requires_tool_chaining_pct": 0.0,
+      "requires_grounding": 0,
+      "requires_grounding_pct": 0.0,
+      "requires_inference": 0,
+      "requires_inference_pct": 0.0
+    },
+    {
+      "arg_name": "item_id",
+      "total_instances": 2,
+      "appears_explicitly": 2,
+      "appears_explicitly_pct": 100.0,
+      "requires_tool_chaining": 0,
+      "requires_tool_chaining_pct": 0.0,
+      "requires_grounding": 0,
+      "requires_grounding_pct": 0.0,
+      "requires_inference": 0,
+      "requires_inference_pct": 0.0
+    },
+    {
+      "arg_name": "item_ids",
+      "total_instances": 88,
+      "appears_explicitly": 0,
+      "appears_explicitly_pct": 0.0,
+      "requires_tool_chaining": 0,
+      "requires_tool_chaining_pct": 0.0,
+      "requires_grounding": 75,
+      "requires_grounding_pct": 85.2,
+      "requires_inference": 13,
+      "requires_inference_pct": 14.8
+    },
+    {
+      "arg_name": "last_name",
+      "total_instances": 60,
+      "appears_explicitly": 60,
+      "appears_explicitly_pct": 100.0,
+      "requires_tool_chaining": 0,
+      "requires_tool_chaining_pct": 0.0,
+      "requires_grounding": 0,
+      "requires_grounding_pct": 0.0,
+      "requires_inference": 0,
+      "requires_inference_pct": 0.0
+    },
+    {
+      "arg_name": "new_item_ids",
+      "total_instances": 55,
+      "appears_explicitly": 0,
+      "appears_explicitly_pct": 0.0,
+      "requires_tool_chaining": 0,
+      "requires_tool_chaining_pct": 0.0,
+      "requires_grounding": 46,
+      "requires_grounding_pct": 83.6,
+      "requires_inference": 9,
+      "requires_inference_pct": 16.4
+    },
+    {
+      "arg_name": "order_id",
+      "total_instances": 277,
+      "appears_explicitly": 27,
+      "appears_explicitly_pct": 9.7,
+      "requires_tool_chaining": 249,
+      "requires_tool_chaining_pct": 89.9,
+      "requires_grounding": 0,
+      "requires_grounding_pct": 0.0,
+      "requires_inference": 1,
+      "requires_inference_pct": 0.4
+    },
+    {
+      "arg_name": "payment_method_id",
+      "total_instances": 89,
+      "appears_explicitly": 0,
+      "appears_explicitly_pct": 0.0,
+      "requires_tool_chaining": 89,
+      "requires_tool_chaining_pct": 100.0,
+      "requires_grounding": 0,
+      "requires_grounding_pct": 0.0,
+      "requires_inference": 0,
+      "requires_inference_pct": 0.0
+    },
+    {
+      "arg_name": "product_id",
+      "total_instances": 42,
+      "appears_explicitly": 0,
+      "appears_explicitly_pct": 0.0,
+      "requires_tool_chaining": 42,
+      "requires_tool_chaining_pct": 100.0,
+      "requires_grounding": 0,
+      "requires_grounding_pct": 0.0,
+      "requires_inference": 0,
+      "requires_inference_pct": 0.0
+    },
+    {
+      "arg_name": "reason",
+      "total_instances": 23,
+      "appears_explicitly": 8,
+      "appears_explicitly_pct": 34.8,
+      "requires_tool_chaining": 1,
+      "requires_tool_chaining_pct": 4.3,
+      "requires_grounding": 11,
+      "requires_grounding_pct": 47.8,
+      "requires_inference": 3,
+      "requires_inference_pct": 13.0
+    },
+    {
+      "arg_name": "state",
+      "total_instances": 20,
+      "appears_explicitly": 3,
+      "appears_explicitly_pct": 15.0,
+      "requires_tool_chaining": 15,
+      "requires_tool_chaining_pct": 75.0,
+      "requires_grounding": 1,
+      "requires_grounding_pct": 5.0,
+      "requires_inference": 1,
+      "requires_inference_pct": 5.0
+    },
+    {
+      "arg_name": "summary",
+      "total_instances": 2,
+      "appears_explicitly": 0,
+      "appears_explicitly_pct": 0.0,
+      "requires_tool_chaining": 0,
+      "requires_tool_chaining_pct": 0.0,
+      "requires_grounding": 2,
+      "requires_grounding_pct": 100.0,
+      "requires_inference": 0,
+      "requires_inference_pct": 0.0
+    },
+    {
+      "arg_name": "user_id",
+      "total_instances": 63,
+      "appears_explicitly": 0,
+      "appears_explicitly_pct": 0.0,
+      "requires_tool_chaining": 63,
+      "requires_tool_chaining_pct": 100.0,
+      "requires_grounding": 0,
+      "requires_grounding_pct": 0.0,
+      "requires_inference": 0,
+      "requires_inference_pct": 0.0
+    },
+    {
+      "arg_name": "zip",
+      "total_instances": 80,
+      "appears_explicitly": 69,
+      "appears_explicitly_pct": 86.2,
+      "requires_tool_chaining": 8,
+      "requires_tool_chaining_pct": 10.0,
+      "requires_grounding": 3,
+      "requires_grounding_pct": 3.8,
+      "requires_inference": 0,
+      "requires_inference_pct": 0.0
+    }
+  ],
+  "failure_heatmap": [
+    {
+      "dimension": "tool",
+      "value": "calculate",
+      "count": 13
+    },
+    {
+      "dimension": "tool",
+      "value": "get_product_details",
+      "count": 9
+    },
+    {
+      "dimension": "tool",
+      "value": "get_order_details",
+      "count": 9
+    },
+    {
+      "dimension": "tool",
+      "value": "modify_pending_order_address",
+      "count": 6
+    },
+    {
+      "dimension": "tool",
+      "value": "return_delivered_order_items",
+      "count": 5
+    },
+    {
+      "dimension": "tool",
+      "value": "exchange_delivered_order_items",
+      "count": 5
+    },
+    {
+      "dimension": "tool",
+      "value": "modify_pending_order_items",
+      "count": 5
+    },
+    {
+      "dimension": "tool",
+      "value": "cancel_pending_order",
+      "count": 3
+    },
+    {
+      "dimension": "tool",
+      "value": "transfer_to_human_agents",
+      "count": 2
+    },
+    {
+      "dimension": "tool",
+      "value": "modify_user_address",
+      "count": 2
+    },
+    {
+      "dimension": "tool",
+      "value": "find_user_id_by_name_zip",
+      "count": 1
+    },
+    {
+      "dimension": "stage",
+      "value": "action",
+      "count": 24
+    },
+    {
+      "dimension": "stage",
+      "value": "lookup",
+      "count": 18
+    },
+    {
+      "dimension": "stage",
+      "value": "reasoning",
+      "count": 13
+    },
+    {
+      "dimension": "stage",
+      "value": "escalation",
+      "count": 2
+    },
+    {
+      "dimension": "stage",
+      "value": "unknown",
+      "count": 2
+    },
+    {
+      "dimension": "stage",
+      "value": "auth",
+      "count": 1
+    },
+    {
+      "dimension": "read_write",
+      "value": "write",
+      "count": 26
+    },
+    {
+      "dimension": "read_write",
+      "value": "read",
+      "count": 19
+    },
+    {
+      "dimension": "read_write",
+      "value": "generic",
+      "count": 15
+    },
+    {
+      "dimension": "argument",
+      "value": "order_id",
+      "count": 20
+    },
+    {
+      "dimension": "argument",
+      "value": "expression",
+      "count": 13
+    },
+    {
+      "dimension": "argument",
+      "value": "item_ids",
+      "count": 11
+    },
+    {
+      "dimension": "argument",
+      "value": "product_id",
+      "count": 9
+    },
+    {
+      "dimension": "argument",
+      "value": "new_item_ids",
+      "count": 7
+    },
+    {
+      "dimension": "argument",
+      "value": "state",
+      "count": 7
+    },
+    {
+      "dimension": "argument",
+      "value": "zip",
+      "count": 5
+    },
+    {
+      "dimension": "argument",
+      "value": "payment_method_id",
+      "count": 4
+    },
+    {
+      "dimension": "argument",
+      "value": "address1",
+      "count": 4
+    },
+    {
+      "dimension": "argument",
+      "value": "address2",
+      "count": 4
+    },
+    {
+      "dimension": "argument",
+      "value": "city",
+      "count": 4
+    },
+    {
+      "dimension": "argument",
+      "value": "country",
+      "count": 4
+    },
+    {
+      "dimension": "argument",
+      "value": "summary",
+      "count": 2
+    },
+    {
+      "dimension": "argument",
+      "value": "reason",
+      "count": 2
+    },
+    {
+      "dimension": "argument",
+      "value": "user_id",
+      "count": 1
+    }
+  ]
+}

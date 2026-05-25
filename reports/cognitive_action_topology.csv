@@ -1,0 +1,17 @@
+tool_name,tool_type,required_args_count,usage_count,avg_turn_distance,avg_chain_depth,grounding_fraction,extraction_burden,memory_burden,readiness_burden,reasoning_burden,grounding_burden,complexity_score
+modify_user_address,write,7,9,9.9,3.9,0.696,very_high,very_high,high,high,high,21
+modify_pending_order_address,write,7,12,11.9,2.4,0.738,very_high,very_high,high,medium,high,20
+exchange_delivered_order_items,write,4,32,20.8,2.9,0.982,very_high,very_high,high,medium,very_high,17
+modify_pending_order_items,write,4,35,24.1,4.1,1.0,very_high,very_high,high,high,very_high,17
+return_delivered_order_items,write,3,36,12.4,5.0,0.828,high,very_high,high,high,very_high,14
+modify_pending_order_payment,write,2,1,12.0,3.0,1.0,medium,very_high,high,medium,very_high,13
+cancel_pending_order,write,2,26,11.7,4.2,0.674,medium,very_high,high,high,high,12
+get_order_details,read,1,285,10.9,3.4,1.0,low,very_high,low,high,very_high,8
+get_product_details,read,1,98,15.7,4.0,1.0,low,very_high,low,high,very_high,8
+transfer_to_human_agents,generic,1,5,18.0,4.0,1.0,low,very_high,low,high,very_high,8
+calculate,generic,1,8,29.7,4.7,1.0,low,very_high,low,high,very_high,8
+get_user_details,read,1,101,7.5,1.2,1.0,low,very_high,low,medium,very_high,6
+get_item_details,read,1,32,4.0,5.5,0.0,low,medium,low,very_high,low,5
+find_user_id_by_name_zip,read,3,85,1.0,0.1,0.017,high,low,low,low,low,3
+find_user_id_by_email,read,1,25,1.4,0.2,0.143,low,low,low,low,low,1
+list_all_product_types,unknown,0,7,0.0,0.0,0.0,low,low,low,low,low,0

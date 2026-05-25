@@ -1,0 +1,222 @@
+{
+  "find_user_id_by_name_zip": {
+    "name": "find_user_id_by_name_zip",
+    "required_args": [
+      "first_name",
+      "last_name",
+      "zip"
+    ],
+    "seen_args": [
+      "first_name",
+      "last_name",
+      "zip"
+    ],
+    "usage_count": 85,
+    "tool_type": "read"
+  },
+  "get_order_details": {
+    "name": "get_order_details",
+    "required_args": [
+      "order_id"
+    ],
+    "seen_args": [
+      "order_id"
+    ],
+    "usage_count": 285,
+    "tool_type": "read"
+  },
+  "get_product_details": {
+    "name": "get_product_details",
+    "required_args": [
+      "product_id"
+    ],
+    "seen_args": [
+      "product_id"
+    ],
+    "usage_count": 98,
+    "tool_type": "read"
+  },
+  "exchange_delivered_order_items": {
+    "name": "exchange_delivered_order_items",
+    "required_args": [
+      "order_id",
+      "item_ids",
+      "new_item_ids",
+      "payment_method_id"
+    ],
+    "seen_args": [
+      "order_id",
+      "item_ids",
+      "new_item_ids",
+      "payment_method_id"
+    ],
+    "usage_count": 32,
+    "tool_type": "write"
+  },
+  "get_user_details": {
+    "name": "get_user_details",
+    "required_args": [
+      "user_id"
+    ],
+    "seen_args": [
+      "user_id"
+    ],
+    "usage_count": 101,
+    "tool_type": "read"
+  },
+  "return_delivered_order_items": {
+    "name": "return_delivered_order_items",
+    "required_args": [
+      "order_id",
+      "item_ids",
+      "payment_method_id"
+    ],
+    "seen_args": [
+      "order_id",
+      "item_ids",
+      "payment_method_id"
+    ],
+    "usage_count": 36,
+    "tool_type": "write"
+  },
+  "modify_pending_order_items": {
+    "name": "modify_pending_order_items",
+    "required_args": [
+      "order_id",
+      "item_ids",
+      "new_item_ids",
+      "payment_method_id"
+    ],
+    "seen_args": [
+      "order_id",
+      "item_ids",
+      "new_item_ids",
+      "payment_method_id"
+    ],
+    "usage_count": 35,
+    "tool_type": "write"
+  },
+  "find_user_id_by_email": {
+    "name": "find_user_id_by_email",
+    "required_args": [
+      "email"
+    ],
+    "seen_args": [
+      "email"
+    ],
+    "usage_count": 25,
+    "tool_type": "read"
+  },
+  "transfer_to_human_agents": {
+    "name": "transfer_to_human_agents",
+    "required_args": [
+      "summary"
+    ],
+    "seen_args": [
+      "summary"
+    ],
+    "usage_count": 5,
+    "tool_type": "generic"
+  },
+  "calculate": {
+    "name": "calculate",
+    "required_args": [
+      "expression"
+    ],
+    "seen_args": [
+      "expression"
+    ],
+    "usage_count": 8,
+    "tool_type": "generic"
+  },
+  "cancel_pending_order": {
+    "name": "cancel_pending_order",
+    "required_args": [
+      "order_id",
+      "reason"
+    ],
+    "seen_args": [
+      "order_id",
+      "reason"
+    ],
+    "usage_count": 26,
+    "tool_type": "write"
+  },
+  "modify_pending_order_address": {
+    "name": "modify_pending_order_address",
+    "required_args": [
+      "order_id",
+      "address1",
+      "address2",
+      "city",
+      "state",
+      "country",
+      "zip"
+    ],
+    "seen_args": [
+      "order_id",
+      "address1",
+      "address2",
+      "city",
+      "state",
+      "country",
+      "zip"
+    ],
+    "usage_count": 12,
+    "tool_type": "write"
+  },
+  "get_item_details": {
+    "name": "get_item_details",
+    "required_args": [
+      "item_id"
+    ],
+    "seen_args": [
+      "item_id"
+    ],
+    "usage_count": 32,
+    "tool_type": "read"
+  },
+  "modify_user_address": {
+    "name": "modify_user_address",
+    "required_args": [
+      "user_id",
+      "address1",
+      "address2",
+      "city",
+      "state",
+      "country",
+      "zip"
+    ],
+    "seen_args": [
+      "user_id",
+      "address1",
+      "address2",
+      "city",
+      "state",
+      "country",
+      "zip"
+    ],
+    "usage_count": 9,
+    "tool_type": "write"
+  },
+  "modify_pending_order_payment": {
+    "name": "modify_pending_order_payment",
+    "required_args": [
+      "order_id",
+      "payment_method_id"
+    ],
+    "seen_args": [
+      "order_id",
+      "payment_method_id"
+    ],
+    "usage_count": 1,
+    "tool_type": "write"
+  },
+  "list_all_product_types": {
+    "name": "list_all_product_types",
+    "required_args": [],
+    "seen_args": [],
+    "usage_count": 7,
+    "tool_type": null
+  }
+}
