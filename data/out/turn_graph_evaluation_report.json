@@ -1,6 +1,6 @@
 {
   "source_dataset": "data/out/turn_supervision.jsonl",
-  "rows_evaluated": 30,
+  "rows_evaluated": 547,
   "results": [
     {
       "graph_id": "monolithic",
@@ -10,7 +10,7 @@
       "argument_exact_match": 0.0,
       "policy_violation_rate": 0.0,
       "stage_failure_rate": 0.0,
-      "failure_count": 30,
+      "failure_count": 547,
       "grounding_mode": "n/a"
     },
     {
@@ -21,29 +21,40 @@
       "argument_exact_match": 0.0,
       "policy_violation_rate": 0.0,
       "stage_failure_rate": 0.0,
-      "failure_count": 30,
+      "failure_count": 547,
       "grounding_mode": "n/a"
     },
     {
       "graph_id": "recommended_stub",
       "node_count": 7,
-      "end_to_end_success": 0.13333333333333333,
-      "tool_name_accuracy": 0.13333333333333333,
+      "end_to_end_success": 0.016453382084095063,
+      "tool_name_accuracy": 0.016453382084095063,
       "argument_exact_match": 0.0,
       "policy_violation_rate": 0.0,
-      "stage_failure_rate": 0.8666666666666667,
-      "failure_count": 30,
+      "stage_failure_rate": 0.9835466179159049,
+      "failure_count": 547,
       "grounding_mode": "stub"
+    },
+    {
+      "graph_id": "recommended_deterministic",
+      "node_count": 7,
+      "end_to_end_success": 0.38939670932358317,
+      "tool_name_accuracy": 0.38939670932358317,
+      "argument_exact_match": 0.22592592592592592,
+      "policy_violation_rate": 0.0,
+      "stage_failure_rate": 0.6106032906764168,
+      "failure_count": 547,
+      "grounding_mode": "deterministic"
     },
     {
       "graph_id": "recommended_oracle",
       "node_count": 7,
       "end_to_end_success": 1.0,
       "tool_name_accuracy": 1.0,
-      "argument_exact_match": 0.9629629629629629,
+      "argument_exact_match": 0.9851851851851852,
       "policy_violation_rate": 0.0,
       "stage_failure_rate": 0.0,
-      "failure_count": 30,
+      "failure_count": 547,
       "grounding_mode": "oracle"
     }
   ]

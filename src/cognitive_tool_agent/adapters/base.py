@@ -4,7 +4,7 @@ from typing import Any, Literal, Protocol, runtime_checkable
 
 from pydantic import BaseModel
 
-AgentMode = Literal["stub", "llm", "oracle", "disabled"]
+AgentMode = Literal["stub", "llm", "oracle", "disabled", "deterministic"]
 
 
 class LLMResult(BaseModel):

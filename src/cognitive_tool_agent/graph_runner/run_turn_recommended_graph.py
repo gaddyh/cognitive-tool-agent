@@ -62,6 +62,14 @@ class TurnGraphEvaluationRunner:
                 "stub",
             ),
             (
+                "recommended_deterministic",
+                ExperimentSpec(
+                    graph=recommended_graph,
+                    runtime=[NodeRuntimeConfig(node_id="grounding", mode="deterministic")],
+                ),
+                "deterministic",
+            ),
+            (
                 "recommended_oracle",
                 ExperimentSpec(
                     graph=recommended_graph,

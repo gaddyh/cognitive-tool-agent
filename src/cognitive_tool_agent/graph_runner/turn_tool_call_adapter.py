@@ -61,48 +61,75 @@ class TurnToolCallAdapter:
         registry: ToolRegistry,
     ) -> list[DatasetRow]:
         rows: list[DatasetRow] = []
-
-        last_user_by_sim: dict[str, str] = {}
         all_tool_names = registry.names()
 
-        for turn in sorted(turns, key=lambda t: (t.simulation_id, t.turn_idx)):
-            if turn.role == "user" and turn.content:
-                last_user_by_sim[turn.simulation_id] = turn.content
-                continue
+        sorted_turns = sorted(turns, key=lambda t: (t.simulation_id, t.turn_idx))
 
-            if turn.role != "assistant":
-                continue
+        sim_turns: dict[str, list[TurnSupervisionRow]] = {}
+        for turn in sorted_turns:
+            sim_turns.setdefault(turn.simulation_id, []).append(turn)
 
-            label = turn.cognitive_label
-            if label.plan_next_action != "call_tool":
-                continue
-            if not label.plan_tool_name:
-                continue
+        for sim_id, sim_turn_list in sim_turns.items():
+            last_user_message: str = ""
+            prior_tool_calls: list[dict] = []
+            prior_tool_results: list[dict] = []
+            conversation_context: list[str] = []
 
-            user_message = last_user_by_sim.get(
-                turn.simulation_id,
-                turn.content or f"Execute {label.plan_tool_name}",
-            )
+            for turn in sim_turn_list:
+                label = turn.cognitive_label
 
-            expected = ExpectedBehavior(
-                expected_action="tool_executed",
-                expected_tool=label.plan_tool_name,
-                expected_arguments=label.plan_arguments or None,
-            )
+                if turn.role == "user":
+                    if turn.content:
+                        last_user_message = turn.content
+                        conversation_context.append(turn.content)
+                    continue
 
-            row = DatasetRow(
-                id=f"{turn.task_id}:{turn.simulation_id[:8]}:turn:{turn.turn_idx}",
-                user_message=user_message,
-                tools=all_tool_names,
-                world_state={
-                    "simulation_id": turn.simulation_id,
-                    "task_id": turn.task_id,
-                    "turn_idx": turn.turn_idx,
-                    "source": "turn_tool_call",
-                    "primary_tool": label.plan_tool_name,
-                },
-                expected=expected,
-            )
-            rows.append(row)
+                if turn.role == "tool":
+                    if turn.content:
+                        prior_tool_results.append({"content": turn.content})
+                        conversation_context.append(turn.content)
+                    continue
+
+                if turn.role != "assistant":
+                    continue
+
+                if label.plan_next_action == "call_tool" and label.plan_tool_name:
+                    user_message = last_user_message or (
+                        turn.content or f"Execute {label.plan_tool_name}"
+                    )
+
+                    expected = ExpectedBehavior(
+                        expected_action="tool_executed",
+                        expected_tool=label.plan_tool_name,
+                        expected_arguments=label.plan_arguments or None,
+                    )
+
+                    row = DatasetRow(
+                        id=f"{turn.task_id}:{sim_id[:8]}:turn:{turn.turn_idx}",
+                        user_message=user_message,
+                        tools=all_tool_names,
+                        world_state={
+                            "simulation_id": sim_id,
+                            "task_id": turn.task_id,
+                            "turn_idx": turn.turn_idx,
+                            "source": "turn_tool_call",
+                            "primary_tool": label.plan_tool_name,
+                            "prior_tool_calls": list(prior_tool_calls),
+                            "prior_tool_results": list(prior_tool_results),
+                            "conversation_context": list(conversation_context),
+                        },
+                        expected=expected,
+                    )
+                    rows.append(row)
+
+                    prior_tool_calls.append(
+                        {
+                            "tool_name": label.plan_tool_name,
+                            "arguments": dict(label.plan_arguments),
+                        }
+                    )
+
+                if turn.content:
+                    conversation_context.append(turn.content)
 
         return rows

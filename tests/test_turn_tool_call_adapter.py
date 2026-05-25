@@ -158,3 +158,87 @@ def test_adapter_registry_contains_all_tools(tmp_path):
 
     assert set(registry.names()) == set(_REGISTRY.keys())
     assert set(rows[0].tools) == set(_REGISTRY.keys())
+
+
+_TURNS_TWO_CALLS = [
+    {
+        "turn_id": f"{_SIM}_turn_0",
+        "simulation_id": _SIM,
+        "task_id": _TASK,
+        "turn_idx": 0,
+        "role": "user",
+        "content": "Please cancel order #W123.",
+        "cognitive_label": {"plan_next_action": None, "plan_tool_name": None, "plan_arguments": {}},
+    },
+    {
+        "turn_id": f"{_SIM}_turn_1",
+        "simulation_id": _SIM,
+        "task_id": _TASK,
+        "turn_idx": 1,
+        "role": "assistant",
+        "content": None,
+        "cognitive_label": {
+            "plan_next_action": "call_tool",
+            "plan_tool_name": "get_user_details",
+            "plan_arguments": {"user_id": "yusuf_rossi_9620"},
+        },
+    },
+    {
+        "turn_id": f"{_SIM}_turn_2",
+        "simulation_id": _SIM,
+        "task_id": _TASK,
+        "turn_idx": 2,
+        "role": "tool",
+        "content": '{"user_id": "yusuf_rossi_9620", "name": "Yusuf Rossi"}',
+        "cognitive_label": {"plan_next_action": None, "plan_tool_name": None, "plan_arguments": {}},
+    },
+    {
+        "turn_id": f"{_SIM}_turn_3",
+        "simulation_id": _SIM,
+        "task_id": _TASK,
+        "turn_idx": 3,
+        "role": "assistant",
+        "content": None,
+        "cognitive_label": {
+            "plan_next_action": "call_tool",
+            "plan_tool_name": "cancel_pending_order",
+            "plan_arguments": {"order_id": "#W123"},
+        },
+    },
+]
+
+
+def test_adapter_first_call_tool_row_has_empty_prior_context(tmp_path):
+    turns_path = _write_turns(tmp_path, _TURNS_TWO_CALLS)
+    registry_path = _write_registry(tmp_path, _REGISTRY)
+
+    rows, _ = TurnToolCallAdapter().load(turns_path, registry_path)
+
+    first_row = next(r for r in rows if "turn:1" in r.id)
+    assert first_row.world_state["prior_tool_calls"] == []
+    assert first_row.world_state["prior_tool_results"] == []
+
+
+def test_adapter_prior_tool_calls_populated(tmp_path):
+    turns_path = _write_turns(tmp_path, _TURNS_TWO_CALLS)
+    registry_path = _write_registry(tmp_path, _REGISTRY)
+
+    rows, _ = TurnToolCallAdapter().load(turns_path, registry_path)
+
+    second_row = next(r for r in rows if "turn:3" in r.id)
+    ptc = second_row.world_state["prior_tool_calls"]
+    assert len(ptc) == 1
+    assert ptc[0]["tool_name"] == "get_user_details"
+    assert ptc[0]["arguments"] == {"user_id": "yusuf_rossi_9620"}
+
+
+def test_adapter_prior_tool_results_populated(tmp_path):
+    turns_path = _write_turns(tmp_path, _TURNS_TWO_CALLS)
+    registry_path = _write_registry(tmp_path, _REGISTRY)
+
+    rows, _ = TurnToolCallAdapter().load(turns_path, registry_path)
+
+    second_row = next(r for r in rows if "turn:3" in r.id)
+    ptr = second_row.world_state["prior_tool_results"]
+    assert len(ptr) == 1
+    assert "yusuf_rossi_9620" in ptr[0]["content"]

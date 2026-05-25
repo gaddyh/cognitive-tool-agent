@@ -61,7 +61,7 @@ def _print_row_preview(rows) -> None:
 def _print_comparison_table(report: GraphEvaluationReport) -> None:
     console.print(f"\n[bold]Graph Comparison[/bold]  ({report.rows_evaluated} rows)\n")
     table = Table(box=box.SIMPLE)
-    table.add_column("Graph", style="cyan")
+    table.add_column("Graph", style="cyan", min_width=26)
     table.add_column("Nodes", justify="right")
     table.add_column("E2E Success", justify="right")
     table.add_column("Tool Acc", justify="right")
@@ -89,7 +89,54 @@ def _print_comparison_table(report: GraphEvaluationReport) -> None:
     console.print(table)
 
 
-def _write_markdown(path: Path, eval_report: GraphEvaluationReport) -> None:
+_TRACKED_FIELDS = ["order_id", "product_id", "user_id", "payment_method_id", "item_ids", "new_item_ids"]
+
+
+def _compute_field_grounding_stats(traces, rows) -> list[tuple]:
+    stats = []
+    for field in _TRACKED_FIELDS:
+        rows_with = 0
+        resolved = 0
+        exact = 0
+        for trace, row in zip(traces, rows):
+            exp_args = row.expected.expected_arguments or {}
+            if field not in exp_args:
+                continue
+            rows_with += 1
+            g = trace.grounding
+            if g and field in g.resolved_args:
+                resolved += 1
+                if g.resolved_args[field] == exp_args[field]:
+                    exact += 1
+        stats.append((field, rows_with, resolved, exact))
+    return stats
+
+
+def _print_field_grounding_summary(traces, rows) -> None:
+    console.print("\n[bold]Field-Level Grounding Summary[/bold]  (recommended_deterministic)\n")
+    table = Table(box=box.SIMPLE)
+    table.add_column("arg_field", style="cyan")
+    table.add_column("rows_with_field", justify="right")
+    table.add_column("det_resolved", justify="right")
+    table.add_column("exact_match", justify="right")
+    table.add_column("resolve_rate", justify="right")
+    table.add_column("match_rate", justify="right")
+
+    for field, rows_with, resolved, exact in _compute_field_grounding_stats(traces, rows):
+        resolve_rate = f"{resolved / rows_with:.0%}" if rows_with else "—"
+        match_rate = f"{exact / rows_with:.0%}" if rows_with else "—"
+        table.add_row(
+            field,
+            str(rows_with),
+            str(resolved),
+            str(exact),
+            resolve_rate,
+            match_rate,
+        )
+    console.print(table)
+
+
+def _write_markdown(path: Path, eval_report: GraphEvaluationReport, det_traces_path: Path | None = None, rows=None) -> None:
     from datetime import datetime, timezone
 
     generated_at = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
@@ -118,6 +165,26 @@ def _write_markdown(path: Path, eval_report: GraphEvaluationReport) -> None:
             f"| {row.failure_count} "
             f"| {row.grounding_mode} |"
         )
+
+    if det_traces_path and det_traces_path.exists() and rows is not None:
+        from cognitive_tool_agent.graph_runner.trace_writer import TraceWriter
+        det_traces = TraceWriter().load(det_traces_path)
+        w("")
+        w("## Field-Level Grounding Summary (recommended_deterministic)")
+        w("")
+        w("| arg_field | rows_with_field | det_resolved | exact_match | resolve_rate | match_rate |")
+        w("|---|---:|---:|---:|---:|---:|")
+        for field, rows_with, resolved, exact in _compute_field_grounding_stats(det_traces, rows):
+            resolve_rate = f"{resolved / rows_with:.0%}" if rows_with else "—"
+            match_rate = f"{exact / rows_with:.0%}" if rows_with else "—"
+            w(
+                f"| `{field}` "
+                f"| {rows_with} "
+                f"| {resolved} "
+                f"| {exact} "
+                f"| {resolve_rate} "
+                f"| {match_rate} |"
+            )
 
     path.write_text("\n".join(lines), encoding="utf-8")
 
@@ -164,7 +231,7 @@ def main() -> None:
 
     _print_row_preview(rows)
 
-    console.print("\nRunning 4 graph configurations...")
+    console.print("\nRunning 5 graph configurations...")
     _print_comparison_table(eval_report)
 
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -174,8 +241,15 @@ def main() -> None:
     with eval_json_path.open("w", encoding="utf-8") as f:
         json.dump(eval_report.model_dump(), f, indent=2, ensure_ascii=False)
 
+    det_traces_path = out_dir / "turn_traces_recommended_deterministic.jsonl"
+
+    if det_traces_path.exists():
+        from cognitive_tool_agent.graph_runner.trace_writer import TraceWriter
+        det_traces = TraceWriter().load(det_traces_path)
+        _print_field_grounding_summary(det_traces, rows)
+
     eval_md_path = reports_dir / "turn_graph_evaluation_report.md"
-    _write_markdown(eval_md_path, eval_report)
+    _write_markdown(eval_md_path, eval_report, det_traces_path if det_traces_path.exists() else None, rows)
 
     console.print()
     for p in (eval_json_path, eval_md_path):
