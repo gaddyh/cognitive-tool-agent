@@ -1,26 +1,35 @@
 from __future__ import annotations
 
-from typing import Any, Protocol, runtime_checkable
-
+from ..adapters.base import AgentMode, ModelAdapter
 from ..schemas.common import Confidence, UserInput
 from ..schemas.reason import ReasoningResult
 from ..schemas.readiness import ReadinessResult
 from ..tools.registry import ToolRegistry
 
 
-@runtime_checkable
-class ModelAdapter(Protocol):
-    def complete(self, prompt: str, output_schema: type) -> Any: ...
-
-
 _CONFIRMATION_REQUIRED_TOOLS = {"cancel_order"}
 
 
 class ReadinessAgent:
-    def __init__(self, model_adapter: ModelAdapter | None = None) -> None:
+    def __init__(
+        self, mode: AgentMode = "stub", model_adapter: ModelAdapter | None = None
+    ) -> None:
+        self.mode = mode
         self._adapter = model_adapter
 
     def run(
+        self,
+        user_input: UserInput,
+        reasoning: ReasoningResult | None,
+        registry: ToolRegistry,
+    ) -> ReadinessResult:
+        if self.mode == "llm":
+            return self._run_llm(user_input, reasoning, registry)
+        if self.mode == "oracle":
+            return self._run_oracle(user_input, reasoning, registry)
+        return self._run_stub(user_input, reasoning, registry)
+
+    def _run_stub(
         self,
         user_input: UserInput,
         reasoning: ReasoningResult | None,
@@ -79,3 +88,19 @@ class ReadinessAgent:
             missing_required_fields=missing_required_fields,
             confidence=Confidence(score=confidence_score, reason="stub readiness check"),
         )
+
+    def _run_llm(
+        self,
+        user_input: UserInput,
+        reasoning: ReasoningResult | None,
+        registry: ToolRegistry,
+    ) -> ReadinessResult:
+        raise NotImplementedError("llm mode not yet implemented for ReadinessAgent")
+
+    def _run_oracle(
+        self,
+        user_input: UserInput,
+        reasoning: ReasoningResult | None,
+        registry: ToolRegistry,
+    ) -> ReadinessResult:
+        raise NotImplementedError("oracle mode not yet implemented for ReadinessAgent")

@@ -1,23 +1,35 @@
 from __future__ import annotations
 
-from typing import Any, Protocol, runtime_checkable
+from typing import Any
 
+from ..adapters.base import AgentMode, ModelAdapter
 from ..schemas.common import Confidence, UserInput
 from ..schemas.reason import ReasoningResult
 from ..schemas.readiness import ReadinessResult
 from ..schemas.plan import PlanResult, ToolCallPlan
-
-
-@runtime_checkable
-class ModelAdapter(Protocol):
-    def complete(self, prompt: str, output_schema: type) -> Any: ...
+from ._stub_heuristics import TOOL_KEYWORDS, extract_order_id
 
 
 class PlanAgent:
-    def __init__(self, model_adapter: ModelAdapter | None = None) -> None:
+    def __init__(
+        self, mode: AgentMode = "stub", model_adapter: ModelAdapter | None = None
+    ) -> None:
+        self.mode = mode
         self._adapter = model_adapter
 
     def run(
+        self,
+        user_input: UserInput,
+        reasoning: ReasoningResult | None,
+        readiness: ReadinessResult | None,
+    ) -> PlanResult:
+        if self.mode == "llm":
+            return self._run_llm(user_input, reasoning, readiness)
+        if self.mode == "oracle":
+            return self._run_oracle(user_input, reasoning, readiness)
+        return self._run_stub(user_input, reasoning, readiness)
+
+    def _run_stub(
         self,
         user_input: UserInput,
         reasoning: ReasoningResult | None,
@@ -65,11 +77,9 @@ class PlanAgent:
     def _plan_from_keywords(
         self, msg: str, tool_names: list[str], user_input: UserInput
     ) -> PlanResult:
-        from ..agents.perceive_agent import _TOOL_KEYWORDS
-
         matched: list[str] = []
         for tool_name in tool_names:
-            keywords = _TOOL_KEYWORDS.get(tool_name, [])
+            keywords = TOOL_KEYWORDS.get(tool_name, [])
             if any(kw in msg for kw in keywords):
                 matched.append(tool_name)
 
@@ -83,14 +93,31 @@ class PlanAgent:
         selected = matched[0]
         args: dict[str, Any] = {}
         for token in user_input.message.split():
-            if token.startswith("#") and len(token) > 1:
-                args["order_id"] = token.lstrip("#")
+            order_id = extract_order_id(token)
+            if order_id is not None:
+                args["order_id"] = order_id
 
         return PlanResult(
             next_action="execute_tool",
             tool_call=ToolCallPlan(tool_name=selected, arguments=args),
             confidence=Confidence(score=0.6, reason="monolithic stub keyword match"),
         )
+
+    def _run_llm(
+        self,
+        user_input: UserInput,
+        reasoning: ReasoningResult | None,
+        readiness: ReadinessResult | None,
+    ) -> PlanResult:
+        raise NotImplementedError("llm mode not yet implemented for PlanAgent")
+
+    def _run_oracle(
+        self,
+        user_input: UserInput,
+        reasoning: ReasoningResult | None,
+        readiness: ReadinessResult | None,
+    ) -> PlanResult:
+        raise NotImplementedError("oracle mode not yet implemented for PlanAgent")
 
 
 def _build_followup(readiness: ReadinessResult, tool: str) -> str:

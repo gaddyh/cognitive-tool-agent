@@ -1,134 +1,80 @@
 # Cognitive Graph Lab
 
-**Dataset-to-Agent-Architecture Lab**: given a behavioral dataset, infer the cognitive topology of the task and recommend the graph that best explains and solves it under measurable constraints.
+**Dataset-to-Agent-Architecture Lab.** Given a behavioral dataset of tool-calling
+traces, infer the *cognitive topology* the task actually requires, recommend an
+executable agent graph that covers those requirements, run it against baselines,
+and surface where the graph still falls short.
+
+The repository is not just a runtime agent. It is a lab for discovering the
+*right* runtime graph from measurable evidence.
 
 ---
 
 ## Core Thesis
 
-Most tool-calling agents fail because their cognitive responsibilities are entangled inside a single prompt.
+Most tool-calling agents fail because their cognitive responsibilities are
+entangled inside a single prompt — perception, extraction, lookup, grounding,
+memory, policy checking, planning, execution, and learning all mixed together.
+That entanglement makes failures hard to debug, evaluate, and optimize.
 
-A single prompt often mixes:
-
-- perception
-- extraction
-- lookup
-- grounding
-- memory
-- readiness / policy checking
-- planning
-- execution
-- learning
-
-This makes failures hard to debug, evaluate, and optimize.
-
-This repository explores a different path:
+This project takes a different path, built on one hypothesis:
 
 > Behavioral datasets contain recoverable cognitive topology.
 
-Instead of only asking:
+Instead of only asking *"did the agent succeed?"*, the lab asks:
 
-```text
-Did the agent succeed?
-```
+- What kind of cognition does this dataset require?
+- Where do tool arguments actually come from?
+- Which capabilities are structurally necessary?
+- Which graph should exist for this task — and does building it actually help?
 
-the lab asks:
-
-```text
-What kind of cognition does this dataset require?
-Where do tool arguments come from?
-Which capabilities are structurally necessary?
-Which graph should exist for this task?
-```
-
-The long-term goal:
-
-> Given a behavioral dataset, learn the cognitive graph that best explains and solves the task under measurable constraints.
+The guiding principle throughout is **no optimization before measurement.**
 
 ---
 
-## New Vision
+## What Currently Works
 
-The project is evolving from a fixed cognitive agent into a **dataset-driven graph recommender**.
+Everything in this repository is **deterministic and inspectable today.** No LLM
+calls are made. Each cognitive agent runs a documented stub heuristic and exposes
+a `model_adapter` slot where a real model backend will later be injected.
 
-The new pipeline:
+The end-to-end loop you can run right now:
 
-```text
-Raw behavioral traces
-  ↓
-Trace-to-Cognitive-Dataset Converter
-  ↓
-Cognitive Dataset Reports
-  ↓
-Capability Inference Engine
-  ↓
-Graph Recommender
-  ↓
-Recommended GraphSpec
-  ↓
-Evaluation / execution / optimization
-```
-
-The key shift:
-
-```text
-from: manually designing cognitive graphs
-to: inferring cognitive graphs from dataset topology
-```
+1. **Convert** raw tau-bench-style simulation traces into deterministic cognitive
+   dataset artifacts.
+2. **Report** on the cognitive topology of those artifacts (burden per tool,
+   argument origins, failure heatmap).
+3. **Infer** which capabilities the dataset requires (memory, grounding,
+   readiness, deep planning) via threshold rules.
+4. **Recommend** an executable graph that covers the inferred capabilities.
+5. **Evaluate** that graph against baselines, including an *oracle* variant.
+6. **Advise** on revisions by comparing stub vs oracle performance to locate the
+   real bottleneck.
 
 ---
 
-## Why Reports Matter
+## Pipeline
 
-The reports expose hidden structure inside a tool-calling dataset.
-
-Examples of cognitive topology signals:
-
-| Signal | Meaning | Graph implication |
-|---|---|---|
-| High tool-chaining % | Important values come from prior tools | memory / state node |
-| High grounding % | Values are not explicit in user text | grounding node |
-| High write failure fraction | State-changing actions are risky | readiness / policy node |
-| High chain depth | Tool decisions depend on prior steps | reasoning node |
-| High explicit arg % | Values are directly extractable | lightweight perception/extraction |
-
-This lets the system recommend graph structure from measurable evidence.
-
----
-
-## Current End-to-End Flow
-
-```text
-1. Convert raw tau-style traces
-   results.json
-     ↓
-   tool_registry.json
-   action_sequence.jsonl
-   turn_supervision.jsonl
-   failure_rows.jsonl
-   conversion_summary.json
-
-2. Build cognitive reports
-   converted artifacts
-     ↓
-   cognitive_dataset_report.json
-   cognitive_dataset_report.md
-   cognitive_action_topology.csv
-   argument_emergence.csv
-   failure_heatmap.csv
-
-3. Infer required capabilities
-   cognitive_dataset_report.json
-     ↓
-   memory_required
-   grounding_required
-   readiness_required
-   deep_planning_required
-
-4. Recommend a graph
-   capability inference
-     ↓
-   recommended_graph.json
+```
+Raw behavioral traces (results.json)
+  │
+  ▼  trace_converter/
+Cognitive dataset artifacts
+  (tool_registry · action_sequence · turn_supervision · failure_rows)
+  │
+  ▼  reports/
+Cognitive topology reports
+  (burden · argument emergence · failure heatmap)
+  │
+  ▼  recommender/
+Capability inference  →  Recommended GraphSpec
+  │
+  ▼  graph_runner/ + graph/
+Multi-graph evaluation
+  (monolithic · minimal · recommended_stub · recommended_oracle)
+  │
+  ▼  recommender/revision_advisor.py
+Graph revision suggestions
 ```
 
 ---
@@ -153,325 +99,202 @@ python scripts/build_reports.py \
 # 3. Recommend a cognitive graph from the report
 python scripts/recommend_graph.py \
   --report data/out/cognitive_dataset_report.json \
-  --out data/out/recommended_graph.json
+  --out reports/recommended_graph.json
 
-# 4. Original micro-demo Lab loop
-python scripts/run_lab.py --dataset data/dev/tool_calling_micro.jsonl
+# 4. Evaluate graphs against each other (monolithic / minimal / stub / oracle)
+python scripts/run_graph_evaluation.py \
+  --recommended reports/recommended_graph.json \
+  --report      reports/cognitive_dataset_report.json \
+  --out-dir     data/out \
+  --reports-dir reports
+
+# Other entry points
+python scripts/run_baseline.py --dataset data/dev/tool_calling_micro.jsonl  # monolithic only
+python scripts/run_lab.py      --dataset data/dev/tool_calling_micro.jsonl  # original lab loop
+python scripts/evaluate_trace.py                                            # score a single trace
 
 # Run tests
 pytest
 ```
 
----
-
-## Trace-to-Cognitive-Dataset Converter
-
-The converter ingests tau-bench-style simulation JSON.
-
-Input structure:
-
-```text
-tasks[]
-  evaluation_criteria.actions[]     # expected tool calls + arguments
-
-simulations[]
-  messages[]                        # user / assistant / tool turns
-  reward_info.action_checks[]       # action_match, action_reward
-```
-
-It emits:
-
-| Artifact | Purpose |
-|---|---|
-| `tool_registry.json` | Per-tool required args, seen args, usage counts, read/write type |
-| `action_sequence.jsonl` | One row per simulation: expected vs actual tool sequences |
-| `turn_supervision.jsonl` | One row per turn: deterministic cognitive labels |
-| `failure_rows.jsonl` | Failed expected actions with aligned actual behavior |
-| `conversion_summary.json` | Fast sanity-check counts |
-
-This layer is intentionally deterministic. No LLM annotation is used.
+Requires Python ≥ 3.11. Runtime dependencies are `pydantic>=2.0` and `rich>=13.0`.
 
 ---
 
-## Cognitive Dataset Reports
+## Scripts
 
-The report builder turns converted traces into cognitive topology.
-
-Main report artifacts:
-
-| Artifact | Purpose |
-|---|---|
-| `cognitive_dataset_report.json` | Machine-readable full report |
-| `cognitive_dataset_report.md` | Human-readable report |
-| `cognitive_action_topology.csv` | Tool-level cognitive burden table |
-| `argument_emergence.csv` | Argument origin matrix |
-| `failure_heatmap.csv` | Failures by tool, stage, read/write, and argument |
-
-### Cognitive Action Topology
-
-Each tool is scored by cognitive burden:
-
-| Signal | Meaning |
-|---|---|
-| extraction burden | number of required arguments |
-| memory burden | average turn distance before action |
-| readiness burden | write tools require confirmation / policy gate |
-| reasoning burden | preceding tool-chain depth |
-| grounding burden | fraction of arguments not directly explicit |
-
-### Argument Emergence Matrix
-
-This is one of the core insights of the project.
-
-It asks:
-
-```text
-Where do tool arguments actually come from?
-```
-
-Examples:
-
-| Argument type | Typical origin |
-|---|---|
-| `first_name`, `last_name`, `zip` | explicit user text |
-| `order_id`, `user_id`, `payment_method_id` | tool-chained |
-| `item_ids`, `new_item_ids` | grounded from natural language + tool results |
-
-This shows that “argument extraction” is not one capability. Different arguments require different cognitive machinery.
+| Script                     | Purpose                                                                 |
+| -------------------------- | ----------------------------------------------------------------------- |
+| `convert_traces.py`        | Raw tau-style traces → deterministic cognitive dataset artifacts        |
+| `build_reports.py`         | Converted artifacts → cognitive topology reports                        |
+| `recommend_graph.py`       | Report → capability inference → recommended `GraphSpec`                 |
+| `run_graph_evaluation.py`  | Run + score 4 graph variants and emit revision advice                   |
+| `run_baseline.py`          | Run only the monolithic baseline, per-row results                       |
+| `run_lab.py`               | Original architecture-search lab loop (profiler → candidates → report)  |
+| `evaluate_trace.py`        | Score a single cognitive trace against expected behavior                |
 
 ---
 
-## Capability Inference Engine
+## The Cognitive Graph
 
-The Capability Inference Engine reads `cognitive_dataset_report.json` and infers which cognitive capabilities are required.
+A `GraphSpec` is a set of typed nodes executed in topological order by
+`GraphExecutor`. No cognitive stages are hardcoded in the executor; the graph
+definition fully controls which nodes run.
 
-Capabilities:
-
-| Capability | Signal |
-|---|---|
-| `memory` | high tool-chaining across arguments |
-| `grounding` | high global or peak grounding pressure |
-| `readiness` | write/action risk and write failure fraction |
-| `deep_planning` | high average tool-chain depth |
-
-The grounding signal uses both:
-
-```text
-global grounding strength
-peak grounding strength
 ```
-
-This prevents high-volume zero-grounding arguments from hiding structurally important arguments like `item_ids` or `new_item_ids`.
-
-Example:
-
-```text
-grounding_strength = weighted global average
-peak_grounding_strength = max grounding % among sufficiently common args
-effective_grounding = max(global, peak)
-```
-
----
-
-## Graph Recommender
-
-The recommender wraps an executable `GraphSpec` inside a `RecommendedGraph`.
-
-Example output:
-
-```text
 perceive → reason → grounding → readiness → plan → act → learn
 ```
 
-The recommendation includes:
+Each node maps to an agent with a deterministic stub implementation today:
 
-```text
-graph_spec
-required_capabilities
-rationale
-confidence
-memory_required
-readiness_required
-parallel_lookup_nodes
-```
+| Node        | Agent             | Stub responsibility                                              |
+| ----------- | ----------------- | ---------------------------------------------------------------- |
+| `perceive`  | `PerceiveAgent`   | Intent candidates, entity mentions, ambiguity detection          |
+| `reason`    | `ReasonAgent`     | Tool selection, entity resolution, missing-requirement detection |
+| `grounding` | `GroundingAgent`  | Resolve references to concrete IDs/values                        |
+| `readiness` | `ReadinessAgent`  | Policy enforcement, confirmation gating, required fields         |
+| `plan`      | `PlanAgent`       | Next action: `execute_tool` / `ask_followup` / `reject`          |
+| `act`       | `ActAgent`        | Tool execution result or user-facing response                    |
+| `learn`     | `LearnAgent`      | Runtime memory update, trace summary                             |
 
-This keeps the recommendation explainable while remaining compatible with the graph executor.
+Not every task needs every node. The goal is to infer the **minimal sufficient
+graph** from the dataset.
 
----
+> Note: the `memory` capability is recommender-only in v1 — it is mapped onto the
+> `learn` node rather than executed as a standalone node.
 
-## Original Graph Builder Lab
+### Grounding modes
 
-The original Lab loop remains as the first architecture-search scaffold:
+`GroundingAgent` is the most developed seam and demonstrates the pattern the rest
+of the agents will follow. It runs in one of three modes:
 
-```text
-Dataset
-  ↓
-Dataset Profiler
-  ↓
-Behavior Decomposer
-  ↓
-Graph Candidate Generator
-  ↓
-Baseline Runner
-  ↓
-Evaluator
-  ↓
-Failure Analyzer
-  ↓
-Graph Optimizer
-  ↓
-LabReport
-```
+- **`stub`** — deterministic heuristic resolution (default).
+- **`oracle`** — resolves arguments directly from expected values, establishing a
+  ceiling for "what if grounding were perfect."
+- **`disabled`** — no grounding performed.
 
-It generates and compares simple graph candidates:
-
-| Candidate | Graph | Notes |
-|---|---|---|
-| A | `monolithic` | Baseline only |
-| B | `perceive → plan → act` | Minimal decomposition |
-| C | `perceive → reason → readiness → plan → act → learn` | Full initial cognitive graph |
-
-This layer is still useful for deterministic candidate evaluation, but the newer report/recommender layer is where the graph structure begins to emerge from dataset topology.
+The oracle mode is what makes the evaluation harness able to quantify how much
+grounding quality actually matters (see below).
 
 ---
 
-## Runtime Cognitive Pipeline
+## Graph Evaluation Harness
 
-The full pipeline may include:
+`run_graph_evaluation.py` runs four graph variants over the dataset:
 
-```text
-UserInput
-  ↓
-PerceptionResult      — intent candidates, entity mentions, ambiguity detection
-  ↓
-ReasoningResult       — tool selection, chain interpretation, missing requirements
-  ↓
-GroundingResult       — resolve natural language entities to concrete IDs/values
-  ↓
-ReadinessResult       — policy enforcement, confirmation gate, required fields
-  ↓
-PlanResult            — next action: execute_tool | ask_followup | reject | abstain
-  ↓
-ActionResult          — tool execution result or user-facing response
-  ↓
-LearningResult        — runtime memory update, trace summary, unresolved goals
-```
+| Variant              | Graph                                                | Role                              |
+| -------------------- | ---------------------------------------------------- | --------------------------------- |
+| `monolithic`         | single keyword→tool mapping                          | floor baseline                    |
+| `minimal`            | `perceive → plan → act`                              | minimal decomposition             |
+| `recommended_stub`   | full recommended graph, stub grounding               | what we'd ship today              |
+| `recommended_oracle` | full recommended graph, oracle grounding             | ceiling if grounding were perfect |
 
-Not every task needs every node.
+The **stub-vs-oracle gap** is the key measurement: it isolates how much of the
+remaining failure is attributable to grounding quality specifically, rather than
+to graph structure.
 
-The goal is to infer the minimal sufficient graph from data.
+### Revision Advisor
+
+`GraphRevisionAdvisor` reads the evaluation report plus capability inference and
+emits targeted suggestions. For example, when oracle grounding beats stub
+grounding by more than a threshold on end-to-end success, it flags grounding as
+the primary bottleneck and recommends investing in a real grounding agent with
+entity lookup and fuzzy ID resolution — rather than blaming graph topology.
+
+---
+
+## Reports
+
+| Artifact                        | Purpose                                            |
+| ------------------------------- | -------------------------------------------------- |
+| `cognitive_dataset_report.json` | Machine-readable full report                       |
+| `cognitive_dataset_report.md`   | Human-readable report                              |
+| `cognitive_action_topology.csv` | Per-tool cognitive burden table                    |
+| `argument_emergence.csv`        | Where each argument comes from                     |
+| `failure_heatmap.csv`           | Failures by tool, stage, read/write, and argument  |
+
+### Argument Emergence
+
+A core insight of the project: "argument extraction" is not one capability.
+Different arguments require different cognitive machinery.
+
+| Argument type                              | Typical origin                                |
+| ------------------------------------------ | --------------------------------------------- |
+| `first_name`, `last_name`, `zip`           | explicit user text                            |
+| `order_id`, `user_id`, `payment_method_id` | tool-chained from prior results               |
+| `item_ids`, `new_item_ids`                 | grounded from natural language + tool results |
+
+---
+
+## Capability Inference
+
+The inference engine reads the cognitive report and decides which capabilities a
+dataset structurally requires, using threshold rules in `recommender/thresholds.py`.
+
+| Capability      | Signal                                       |
+| --------------- | -------------------------------------------- |
+| `memory`        | high tool-chaining across arguments          |
+| `grounding`     | high global *or* peak grounding pressure     |
+| `readiness`     | write/action risk and write failure fraction |
+| `deep_planning` | high average tool-chain depth                |
+
+Grounding uses both a global average and a **peak** signal, so a flood of trivial
+zero-grounding arguments cannot statistically hide a rare but structurally
+critical argument like `item_ids`.
+
+---
+
+## Evaluation Metrics
+
+| Metric                  | Stage     | Description                                  |
+| ----------------------- | --------- | -------------------------------------------- |
+| `end_to_end_success`    | —         | Final action matches expected                |
+| `tool_name_accuracy`    | plan      | Correct tool selected                        |
+| `argument_exact_match`  | act       | Arguments exactly match expected             |
+| `policy_violation_rate` | readiness | Fraction of rows with policy violations      |
+| `stage_failure_rate`    | —         | Fraction with any stage failure              |
 
 ---
 
 ## Repository Structure
 
-```text
-cognitive-tool-agent/
-│
-├── src/cognitive_tool_agent/
-│   │
-│   ├── schemas/
-│   │   ├── common.py              UserInput, ToolSchema, Confidence, Evidence
-│   │   ├── perceive.py            PerceptionResult
-│   │   ├── reason.py              ReasoningResult
-│   │   ├── readiness.py           ReadinessResult
-│   │   ├── plan.py                PlanResult, ToolCallPlan
-│   │   ├── act.py                 ActionResult
-│   │   ├── learn.py               LearningResult, FailureAnalysis
-│   │   ├── trace.py               CognitiveTrace
-│   │   ├── dataset.py             DatasetRow, ExpectedBehavior
-│   │   ├── graph_spec.py          NodeSpec, EdgeSpec, GraphSpec
-│   │   ├── graph_builder.py       DatasetProfile, LabReport, FailureMap, ...
-│   │   ├── simulation.py          Raw tau-style simulation schemas
-│   │   ├── trace_converter.py     Converter artifact schemas
-│   │   └── recommender.py         CapabilityRequirement, RecommendedGraph
-│   │
-│   ├── trace_converter/
-│   │   ├── simulation_loader.py
-│   │   ├── tool_registry_scanner.py
-│   │   ├── action_aligner.py
-│   │   ├── turn_supervisor.py
-│   │   ├── failure_extractor.py
-│   │   └── converter.py
-│   │
-│   ├── reports/
-│   │   ├── report_builder.py
-│   │   ├── action_topology.py
-│   │   ├── argument_emergence.py
-│   │   └── failure_heatmap.py
-│   │
-│   ├── recommender/
-│   │   ├── thresholds.py
-│   │   ├── signal_extractor.py
-│   │   ├── capability_inference.py
-│   │   └── graph_recommender.py
-│   │
-│   ├── agents/
-│   │   ├── perceive_agent.py
-│   │   ├── reason_agent.py
-│   │   ├── readiness_agent.py
-│   │   ├── plan_agent.py
-│   │   ├── act_agent.py
-│   │   └── learn_agent.py
-│   │
-│   ├── graph/
-│   │   └── cognitive_graph.py      GraphExecutor, RunContext
-│   │
-│   ├── graph_builder/
-│   │   ├── dataset_profiler.py
-│   │   ├── behavior_decomposer.py
-│   │   ├── graph_candidate_generator.py
-│   │   ├── evaluation_designer.py
-│   │   ├── baseline_runner.py
-│   │   ├── failure_analyzer.py
-│   │   ├── graph_optimizer.py
-│   │   └── lab.py
-│   │
-│   ├── evals/
-│   │   ├── metrics.py
-│   │   └── evaluator.py
-│   │
-│   ├── tools/
-│   │   ├── registry.py
-│   │   └── fake_tools.py
-│   │
-│   └── datasets/
-│       └── loader.py
-│
-├── data/
-│   ├── raw/
-│   ├── out/
-│   └── dev/
-│       └── tool_calling_micro.jsonl
-│
-├── scripts/
-│   ├── convert_traces.py
-│   ├── build_reports.py
-│   ├── recommend_graph.py
-│   ├── run_lab.py
-│   ├── run_baseline.py
-│   └── evaluate_trace.py
-│
-└── tests/
-    ├── test_schemas.py
-    ├── test_graph_smoke.py
-    ├── test_trace_converter.py
-    └── test_recommender.py
+```
+src/cognitive_tool_agent/
+├── schemas/            Pydantic contracts for every stage, artifact, and graph
+├── trace_converter/    Deterministic tau-style trace → cognitive artifacts
+├── reports/            Cognitive topology report builders
+├── recommender/        Signal extraction, capability inference, graph recommendation,
+│                       and the revision advisor
+├── agents/             Stub cognitive agents (perceive … learn), each with a
+│                       model_adapter slot for future LLM backends
+├── graph/              GraphExecutor + RunContext (node-driven execution)
+├── graph_runner/       Multi-graph evaluation harness + trace writer
+├── graph_builder/      Original lab loop (profiler, candidate generator, optimizer)
+├── evals/              Metrics and evaluator
+├── tools/              Tool registry + fake tools for offline runs
+└── datasets/           JSONL dataset loader
+
+data/
+├── raw/                Input simulation traces
+├── out/                Converted artifacts, reports, evaluation outputs
+├── dev/                Small dev datasets (tool_calling_micro.jsonl, ...)
+└── test/               Test fixtures
+
+scripts/                CLI entry points (see Scripts table above)
+tests/                  pytest suite (schemas, converter, recommender, graph runner, ...)
 ```
 
 ---
 
 ## Backend Design
 
-Current backend: `stub`.
-
-All current inference is deterministic and inspectable:
+Current backend: **`stub`**. All inference is deterministic and inspectable:
 
 - trace conversion is deterministic
 - report generation is deterministic
 - capability inference is threshold-based
 - graph recommendation is rule-based
-- runtime agents are stub/rule-based
+- runtime agents are stub / rule-based
 
 Every agent exposes a future `ModelAdapter` slot:
 
@@ -480,77 +303,32 @@ class PerceiveAgent:
     def __init__(self, model_adapter: ModelAdapter | None = None): ...
 ```
 
-Future backends:
-
-- OpenAI
-- Anthropic
-- configurable per-node routing
-- DSPy optimization over prompts/programs
-- learned graph search
-
-The architecture is designed so models can replace heuristics without changing dataset contracts.
-
----
-
-## Evaluation Metrics
-
-| Metric | Stage | Description |
-|---|---|---|
-| `end_to_end_success` | — | Final action matches expected |
-| `tool_name_accuracy` | plan | Correct tool selected |
-| `argument_exact_match` | act | Arguments exactly match expected |
-| `policy_violation_rate` | readiness | Fraction of rows with policy violations |
-| `stage_failure_rate` | — | Fraction with any stage failure |
-| `capability_coverage` | graph | Recommended graph covers inferred required capabilities |
-| `graph_complexity` | graph | Number of nodes / expected cost / expected latency |
+Planned backends: OpenAI, Anthropic, configurable per-node routing, DSPy
+optimization over prompts/programs, and learned graph search. The architecture is
+designed so models can replace heuristics **without changing dataset contracts.**
 
 ---
 
 ## Development Principle
 
-No optimization before measurement.
+> No optimization before measurement.
 
-The intended workflow:
-
-```text
-raw traces
-  ↓
-deterministic conversion
-  ↓
-topology report
-  ↓
-capability inference
-  ↓
-graph recommendation
-  ↓
-baseline execution
-  ↓
-failure analysis
-  ↓
-optimization
+```
+raw traces → deterministic conversion → topology report → capability inference
+→ graph recommendation → baseline execution → failure analysis → optimization
 ```
 
 Datasets are treated as behavior-space specifications, not example collections.
-
-Metrics act as selection pressure.
-
-Graph search should be driven by measured failures, not prompt intuition.
+Metrics act as selection pressure. Graph search is driven by measured failures,
+not prompt intuition.
 
 ---
 
 ## Long-Term Goal
 
-> Build a measurable cognitive operating system for production agents.
+> Build a measurable cognitive operating system for production agents —
 
-Where:
-
-- datasets reveal required capabilities
-- reports expose cognitive topology
-- graph recommendations are evidence-based
-- each node has explicit contracts
-- failures are mapped to cognitive stages
-- optimizers search over measurable behavior space
-
-The repo is not just a runtime agent.
-
-It is a lab for discovering the right runtime graph.
+where datasets reveal required capabilities, reports expose cognitive topology,
+graph recommendations are evidence-based, each node has explicit contracts,
+failures map to cognitive stages, and optimizers search over measurable behavior
+space.

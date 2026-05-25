@@ -1,22 +1,26 @@
 from __future__ import annotations
 
-from typing import Any, Protocol, runtime_checkable
-
+from ..adapters.base import AgentMode, ModelAdapter
 from ..schemas.act import ActionResult
 from ..schemas.plan import PlanResult
 from ..tools.registry import ToolRegistry
 
 
-@runtime_checkable
-class ModelAdapter(Protocol):
-    def complete(self, prompt: str, output_schema: type) -> Any: ...
-
-
 class ActAgent:
-    def __init__(self, model_adapter: ModelAdapter | None = None) -> None:
+    def __init__(
+        self, mode: AgentMode = "stub", model_adapter: ModelAdapter | None = None
+    ) -> None:
+        self.mode = mode
         self._adapter = model_adapter
 
     def run(self, plan: PlanResult | None, registry: ToolRegistry) -> ActionResult:
+        if self.mode == "llm":
+            return self._run_llm(plan, registry)
+        if self.mode == "oracle":
+            return self._run_oracle(plan, registry)
+        return self._run_stub(plan, registry)
+
+    def _run_stub(self, plan: PlanResult | None, registry: ToolRegistry) -> ActionResult:
         if plan is None:
             return ActionResult(
                 action_type="abstained",
@@ -87,3 +91,9 @@ class ActAgent:
             success=False,
             error=f"unknown next_action: {next_action!r}",
         )
+
+    def _run_llm(self, plan: PlanResult | None, registry: ToolRegistry) -> ActionResult:
+        raise NotImplementedError("llm mode not yet implemented for ActAgent")
+
+    def _run_oracle(self, plan: PlanResult | None, registry: ToolRegistry) -> ActionResult:
+        raise NotImplementedError("oracle mode not yet implemented for ActAgent")

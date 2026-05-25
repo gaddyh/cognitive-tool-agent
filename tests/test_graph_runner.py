@@ -274,7 +274,7 @@ def test_grounding_agent_stub_returns_grounding_result():
     from cognitive_tool_agent.schemas.common import UserInput
     from cognitive_tool_agent.schemas.dataset import DatasetRow, ExpectedBehavior
 
-    agent = GroundingAgent(grounding_mode="stub")
+    agent = GroundingAgent(mode="stub")
     user_input = UserInput(message="Cancel my order", available_tools=[])
     row = DatasetRow(
         id="r1",
@@ -291,7 +291,7 @@ def test_grounding_agent_oracle_uses_expected_args():
     from cognitive_tool_agent.schemas.common import UserInput
     from cognitive_tool_agent.schemas.dataset import DatasetRow, ExpectedBehavior
 
-    agent = GroundingAgent(grounding_mode="oracle")
+    agent = GroundingAgent(mode="oracle")
     user_input = UserInput(message="Cancel order", available_tools=[])
     row = DatasetRow(
         id="r2",
@@ -313,7 +313,7 @@ def test_grounding_agent_disabled_returns_empty():
     from cognitive_tool_agent.schemas.common import UserInput
     from cognitive_tool_agent.schemas.dataset import DatasetRow, ExpectedBehavior
 
-    agent = GroundingAgent(grounding_mode="disabled")
+    agent = GroundingAgent(mode="disabled")
     user_input = UserInput(message="x", available_tools=[])
     row = DatasetRow(
         id="r3",
@@ -356,7 +356,8 @@ def test_graph_executor_runs_grounding_node():
             expected_tool="get_order_status",
         ),
     )
-    executor = GraphExecutor(grounding_mode="stub")
+    from cognitive_tool_agent.graph.cognitive_graph import NodeConfig
+    executor = GraphExecutor(node_configs={"grounding": NodeConfig(mode="stub")})
     trace = executor.run(graph, row, DEFAULT_REGISTRY)
 
     assert trace.grounding is not None

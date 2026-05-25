@@ -1,22 +1,26 @@
 from __future__ import annotations
 
-from typing import Any, Protocol, runtime_checkable
-
+from ..adapters.base import AgentMode, ModelAdapter
 from ..schemas.common import UserInput
 from ..schemas.learn import FailureAnalysis, LearningResult
 from ..schemas.trace import CognitiveTrace
 
 
-@runtime_checkable
-class ModelAdapter(Protocol):
-    def complete(self, prompt: str, output_schema: type) -> Any: ...
-
-
 class LearnAgent:
-    def __init__(self, model_adapter: ModelAdapter | None = None) -> None:
+    def __init__(
+        self, mode: AgentMode = "stub", model_adapter: ModelAdapter | None = None
+    ) -> None:
+        self.mode = mode
         self._adapter = model_adapter
 
     def run(self, user_input: UserInput, trace: CognitiveTrace) -> LearningResult:
+        if self.mode == "llm":
+            return self._run_llm(user_input, trace)
+        if self.mode == "oracle":
+            return self._run_oracle(user_input, trace)
+        return self._run_stub(user_input, trace)
+
+    def _run_stub(self, user_input: UserInput, trace: CognitiveTrace) -> LearningResult:
         failed_stage, failure_type, explanation = _diagnose(trace)
 
         overall_success = (
@@ -35,6 +39,12 @@ class LearnAgent:
             regression_tags=_regression_tags(trace),
             optimization_target=failed_stage if failed_stage != "none" else None,
         )
+
+    def _run_llm(self, user_input: UserInput, trace: CognitiveTrace) -> LearningResult:
+        raise NotImplementedError("llm mode not yet implemented for LearnAgent")
+
+    def _run_oracle(self, user_input: UserInput, trace: CognitiveTrace) -> LearningResult:
+        raise NotImplementedError("oracle mode not yet implemented for LearnAgent")
 
 
 def _diagnose(

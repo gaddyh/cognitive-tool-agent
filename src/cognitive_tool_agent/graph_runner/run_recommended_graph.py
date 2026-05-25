@@ -5,7 +5,7 @@ from collections import Counter
 from pathlib import Path
 
 from ..evals.evaluator import Evaluator
-from ..graph.cognitive_graph import GraphExecutor
+from ..graph.cognitive_graph import GraphExecutor, NodeConfig
 from ..graph_builder.failure_analyzer import FailureAnalyzer
 from ..graph_builder.graph_candidate_generator import (
     _make_monolithic,
@@ -56,8 +56,9 @@ class GraphEvaluationRunner:
         run_results: list[GraphRunResult] = []
 
         for graph_id, graph_spec, grounding_mode in run_configs:
+            grounding_node_mode = grounding_mode if grounding_mode != "n/a" else "disabled"
             executor = GraphExecutor(
-                grounding_mode=grounding_mode if grounding_mode != "n/a" else "disabled"
+                node_configs={"grounding": NodeConfig(mode=grounding_node_mode)}
             )
             traces = [executor.run(graph_spec, row, registry) for row in rows]
 

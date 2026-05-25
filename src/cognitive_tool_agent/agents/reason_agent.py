@@ -1,22 +1,30 @@
 from __future__ import annotations
 
-from typing import Any, Protocol, runtime_checkable
-
+from ..adapters.base import AgentMode, ModelAdapter
 from ..schemas.common import Confidence, Evidence, UserInput
 from ..schemas.perceive import PerceptionResult
 from ..schemas.reason import MissingRequirement, ReasoningResult, ResolvedEntity
 
 
-@runtime_checkable
-class ModelAdapter(Protocol):
-    def complete(self, prompt: str, output_schema: type) -> Any: ...
-
-
 class ReasonAgent:
-    def __init__(self, model_adapter: ModelAdapter | None = None) -> None:
+    def __init__(
+        self, mode: AgentMode = "stub", model_adapter: ModelAdapter | None = None
+    ) -> None:
+        self.mode = mode
         self._adapter = model_adapter
 
     def run(
+        self,
+        user_input: UserInput,
+        perception: PerceptionResult | None,
+    ) -> ReasoningResult:
+        if self.mode == "llm":
+            return self._run_llm(user_input, perception)
+        if self.mode == "oracle":
+            return self._run_oracle(user_input, perception)
+        return self._run_stub(user_input, perception)
+
+    def _run_stub(
         self,
         user_input: UserInput,
         perception: PerceptionResult | None,
@@ -103,3 +111,17 @@ class ReasonAgent:
             confidence=Confidence(score=confidence_score, reason="stub reasoning"),
             evidence=evidence,
         )
+
+    def _run_llm(
+        self,
+        user_input: UserInput,
+        perception: PerceptionResult | None,
+    ) -> ReasoningResult:
+        raise NotImplementedError("llm mode not yet implemented for ReasonAgent")
+
+    def _run_oracle(
+        self,
+        user_input: UserInput,
+        perception: PerceptionResult | None,
+    ) -> ReasoningResult:
+        raise NotImplementedError("oracle mode not yet implemented for ReasonAgent")

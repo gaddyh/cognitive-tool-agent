@@ -1,30 +1,26 @@
 from __future__ import annotations
 
-from typing import Any, Protocol, runtime_checkable
-
+from ..adapters.base import AgentMode, ModelAdapter
 from ..schemas.common import Confidence, Evidence, UserInput
 from ..schemas.perceive import MentionedEntity, PerceptionResult, RawFieldCandidate
-
-
-@runtime_checkable
-class ModelAdapter(Protocol):
-    def complete(self, prompt: str, output_schema: type) -> Any: ...
-
-
-_TOOL_KEYWORDS: dict[str, list[str]] = {
-    "get_order_status": ["status", "where is", "track", "tracking"],
-    "cancel_order": ["cancel", "cancellation", "stop", "delete order"],
-    "update_address": ["address", "shipping address", "change address", "update address", "deliver to"],
-}
-
-_ORDER_ID_HINT = "#"
+from ._stub_heuristics import TOOL_KEYWORDS, extract_order_id, is_address_like
 
 
 class PerceiveAgent:
-    def __init__(self, model_adapter: ModelAdapter | None = None) -> None:
+    def __init__(
+        self, mode: AgentMode = "stub", model_adapter: ModelAdapter | None = None
+    ) -> None:
+        self.mode = mode
         self._adapter = model_adapter
 
     def run(self, user_input: UserInput) -> PerceptionResult:
+        if self.mode == "llm":
+            return self._run_llm(user_input)
+        if self.mode == "oracle":
+            return self._run_oracle(user_input)
+        return self._run_stub(user_input)
+
+    def _run_stub(self, user_input: UserInput) -> PerceptionResult:
         msg = user_input.message.lower()
         tool_names = [t.name for t in user_input.available_tools]
 
@@ -32,7 +28,7 @@ class PerceiveAgent:
         candidate_tools: list[str] = []
 
         for tool_name in tool_names:
-            keywords = _TOOL_KEYWORDS.get(tool_name, [])
+            keywords = TOOL_KEYWORDS.get(tool_name, [])
             if any(kw in msg for kw in keywords):
                 candidate_tools.append(tool_name)
                 intent_candidates.append(f"use_{tool_name}")
@@ -53,14 +49,14 @@ class PerceiveAgent:
         raw_field_candidates: list[RawFieldCandidate] = []
 
         for token in user_input.message.split():
-            if token.startswith(_ORDER_ID_HINT) and len(token) > 1:
-                order_id = token.lstrip("#")
+            order_id = extract_order_id(token)
+            if order_id is not None:
                 mentioned_entities.append(MentionedEntity(text=token, entity_type="order_id"))
                 raw_field_candidates.append(
                     RawFieldCandidate(name="order_id", value=order_id, evidence_text=token)
                 )
 
-        if "42 maple" in msg or "street" in msg or "springfield" in msg:
+        if is_address_like(msg):
             raw_field_candidates.append(
                 RawFieldCandidate(
                     name="new_address",
@@ -88,3 +84,9 @@ class PerceiveAgent:
             confidence=Confidence(score=confidence_score, reason="stub keyword match"),
             evidence=evidence,
         )
+
+    def _run_llm(self, user_input: UserInput) -> PerceptionResult:
+        raise NotImplementedError("llm mode not yet implemented for PerceiveAgent")
+
+    def _run_oracle(self, user_input: UserInput) -> PerceptionResult:
+        raise NotImplementedError("oracle mode not yet implemented for PerceiveAgent")

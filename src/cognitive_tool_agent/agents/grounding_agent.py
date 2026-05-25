@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Literal
+from typing import Any
 
+from ..adapters.base import AgentMode
 from ..schemas.common import UserInput
 from ..schemas.dataset import DatasetRow
 from ..schemas.grounding import GroundingResult
@@ -17,10 +18,8 @@ def _looks_like_id_field(name: str) -> bool:
 
 
 class GroundingAgent:
-    def __init__(
-        self, grounding_mode: Literal["stub", "oracle", "disabled"] = "stub"
-    ) -> None:
-        self.grounding_mode = grounding_mode
+    def __init__(self, mode: AgentMode = "stub") -> None:
+        self.mode = mode
 
     def run(
         self,
@@ -28,10 +27,10 @@ class GroundingAgent:
         reasoning: ReasoningResult | None,
         row: DatasetRow,
     ) -> GroundingResult:
-        if self.grounding_mode == "disabled":
+        if self.mode == "disabled":
             return GroundingResult(grounding_mode="disabled")
 
-        if self.grounding_mode == "oracle":
+        if self.mode == "oracle":
             return self._run_oracle(row)
 
         return self._run_stub(user_input, reasoning)

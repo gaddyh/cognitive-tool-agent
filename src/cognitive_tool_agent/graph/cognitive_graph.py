@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
+from ..adapters.base import AgentMode, ModelAdapter
 from ..schemas.common import UserInput
 from ..schemas.dataset import DatasetRow
 from ..schemas.graph_spec import EdgeSpec, GraphSpec, NodeSpec, NodeRole  # noqa: F401
@@ -15,6 +16,14 @@ from ..schemas.act import ActionResult
 from ..schemas.learn import LearningResult
 from ..schemas.trace import CognitiveTrace
 from ..tools.registry import ToolRegistry
+
+
+@dataclass
+class NodeConfig:
+    """Per-node execution configuration injected into GraphExecutor."""
+
+    mode: AgentMode = "stub"
+    model_adapter: ModelAdapter | None = None
 
 
 @dataclass
@@ -64,7 +73,7 @@ class GraphExecutor:
     stages are hardcoded; the graph definition fully controls execution.
     """
 
-    def __init__(self, grounding_mode: str = "stub") -> None:
+    def __init__(self, node_configs: dict[NodeRole, NodeConfig] | None = None) -> None:
         from ..agents.perceive_agent import PerceiveAgent
         from ..agents.reason_agent import ReasonAgent
         from ..agents.grounding_agent import GroundingAgent
@@ -73,13 +82,19 @@ class GraphExecutor:
         from ..agents.act_agent import ActAgent
         from ..agents.learn_agent import LearnAgent
 
-        self._perceive = PerceiveAgent()
-        self._reason = ReasonAgent()
-        self._grounding = GroundingAgent(grounding_mode=grounding_mode)  # type: ignore[arg-type]
-        self._readiness = ReadinessAgent()
-        self._plan = PlanAgent()
-        self._act = ActAgent()
-        self._learn = LearnAgent()
+        cfg: dict[NodeRole, NodeConfig] = node_configs or {}
+        default = NodeConfig()
+
+        def _cfg(role: NodeRole) -> NodeConfig:
+            return cfg.get(role, default)
+
+        self._perceive = PerceiveAgent(mode=_cfg("perceive").mode, model_adapter=_cfg("perceive").model_adapter)
+        self._reason = ReasonAgent(mode=_cfg("reason").mode, model_adapter=_cfg("reason").model_adapter)
+        self._grounding = GroundingAgent(mode=_cfg("grounding").mode)
+        self._readiness = ReadinessAgent(mode=_cfg("readiness").mode, model_adapter=_cfg("readiness").model_adapter)
+        self._plan = PlanAgent(mode=_cfg("plan").mode, model_adapter=_cfg("plan").model_adapter)
+        self._act = ActAgent(mode=_cfg("act").mode, model_adapter=_cfg("act").model_adapter)
+        self._learn = LearnAgent(mode=_cfg("learn").mode, model_adapter=_cfg("learn").model_adapter)
 
     def run(self, graph_spec: GraphSpec, row: DatasetRow, registry: ToolRegistry) -> CognitiveTrace:
         ctx = RunContext(row=row, registry=registry)
@@ -113,7 +128,7 @@ class GraphExecutor:
             ctx.learning = self._learn.run(user_input, ctx.to_trace())
 
         elif role == "monolithic":
-            ctx.plan, ctx.action = _run_monolithic(user_input, ctx.registry)
+            ctx.plan, ctx.action = _run_monolithic(user_input, ctx.registry, self._plan, self._act)
 
         elif role == "grounding":
             ctx.grounding = self._grounding.run(user_input, ctx.reasoning, ctx.row)
@@ -130,14 +145,15 @@ class GraphExecutor:
 
 
 def _run_monolithic(
-    user_input: UserInput, registry: ToolRegistry
+    user_input: UserInput,
+    registry: ToolRegistry,
+    plan_agent: Any,
+    act_agent: Any,
 ) -> tuple[PlanResult, ActionResult]:
     """
     Monolithic baseline: direct keyword → tool mapping, no cognitive stages.
+    Uses the executor's own injected agents so baseline and pipeline share config.
     """
-    from ..agents.plan_agent import PlanAgent
-    from ..agents.act_agent import ActAgent
-
-    plan = PlanAgent().run(user_input, reasoning=None, readiness=None)
-    action = ActAgent().run(plan, registry)
+    plan = plan_agent.run(user_input, reasoning=None, readiness=None)
+    action = act_agent.run(plan, registry)
     return plan, action
