@@ -54,7 +54,9 @@ class PlanAgent:
                 confidence=Confidence(score=0.8, reason="readiness blocked"),
             )
 
-        if reasoning.reasoning_status in ("needs_clarification",):
+        if reasoning.reasoning_status in ("needs_clarification",) and (
+            readiness is None or not readiness.ready
+        ):
             return PlanResult(
                 next_action="ask_followup",
                 followup_question=_build_clarification(reasoning),

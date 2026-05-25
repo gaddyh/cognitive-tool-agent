@@ -1,6 +1,6 @@
 # Cognitive Dataset Report
 
-_Generated: 2026-05-25 00:41 UTC — Source: `data/out`_
+_Generated: 2026-05-25 19:04 UTC — Source: `baseline_retail_100`_
 
 ## Dataset Summary
 

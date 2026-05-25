@@ -1,6 +1,6 @@
 # Cognitive Graph Recommendation
 
-_Generated: 2026-05-25 01:13 UTC — Source: `reports/cognitive_dataset_report.json`_
+_Generated: 2026-05-25 19:04 UTC — Source: `reports/cognitive_dataset_report.json`_
 
 ## Capability Inference
 

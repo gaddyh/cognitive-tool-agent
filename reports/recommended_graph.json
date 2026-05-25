@@ -5,7 +5,6 @@
       {
         "id": "perceive",
         "role": "perceive",
-        "model_hint": "stub",
         "prompt_template": null,
         "input_schema": null,
         "output_schema": null
@@ -13,7 +12,6 @@
       {
         "id": "reason",
         "role": "reason",
-        "model_hint": "stub",
         "prompt_template": null,
         "input_schema": null,
         "output_schema": null
@@ -21,7 +19,6 @@
       {
         "id": "grounding",
         "role": "grounding",
-        "model_hint": "stub",
         "prompt_template": null,
         "input_schema": null,
         "output_schema": null
@@ -29,7 +26,6 @@
       {
         "id": "readiness",
         "role": "readiness",
-        "model_hint": "stub",
         "prompt_template": null,
         "input_schema": null,
         "output_schema": null
@@ -37,7 +33,6 @@
       {
         "id": "plan",
         "role": "plan",
-        "model_hint": "stub",
         "prompt_template": null,
         "input_schema": null,
         "output_schema": null
@@ -45,7 +40,6 @@
       {
         "id": "act",
         "role": "act",
-        "model_hint": "stub",
         "prompt_template": null,
         "input_schema": null,
         "output_schema": null
@@ -53,7 +47,6 @@
       {
         "id": "learn",
         "role": "learn",
-        "model_hint": "stub",
         "prompt_template": null,
         "input_schema": null,
         "output_schema": null
@@ -63,31 +56,55 @@
       {
         "from_node": "perceive",
         "to_node": "reason",
+        "provides": "perception",
         "condition": null
       },
       {
         "from_node": "reason",
         "to_node": "grounding",
+        "provides": "reasoning",
+        "condition": null
+      },
+      {
+        "from_node": "reason",
+        "to_node": "readiness",
+        "provides": "reasoning",
         "condition": null
       },
       {
         "from_node": "grounding",
         "to_node": "readiness",
+        "provides": "grounding",
+        "condition": null
+      },
+      {
+        "from_node": "reason",
+        "to_node": "plan",
+        "provides": "reasoning",
+        "condition": null
+      },
+      {
+        "from_node": "grounding",
+        "to_node": "plan",
+        "provides": "grounding",
         "condition": null
       },
       {
         "from_node": "readiness",
         "to_node": "plan",
+        "provides": "readiness",
         "condition": null
       },
       {
         "from_node": "plan",
         "to_node": "act",
+        "provides": "plan",
         "condition": null
       },
       {
         "from_node": "act",
         "to_node": "learn",
+        "provides": null,
         "condition": null
       }
     ],

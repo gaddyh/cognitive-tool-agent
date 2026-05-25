@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-05-25 00:41 UTC",
-  "source": "data/out",
+  "generated_at": "2026-05-25 19:04 UTC",
+  "source": "baseline_retail_100",
   "dataset_summary": {
     "tasks_count": 100,
     "simulations_count": 100,
