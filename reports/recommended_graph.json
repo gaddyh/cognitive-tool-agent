@@ -117,42 +117,48 @@
   "rationale": [
     "perceive always included (signal extraction baseline)",
     "plan + act always included (core action execution)",
-    "reason included: avg_chain_depth=3.04 exceeds reasoning threshold",
-    "grounding included: grounding_strength=0.85 — NL→structured mapping required",
-    "readiness included: readiness_strength=0.43 — write-risk gate required",
+    "reason included: avg_chain_depth=2.54 exceeds reasoning threshold",
+    "grounding included: grounding_strength=0.87 — NL→structured mapping required",
+    "readiness included: readiness_strength=0.42 — write-risk gate required",
     "learn included: chaining_strength=0.54 — persistent state/memory required"
   ],
   "required_capabilities": {
     "memory": {
       "required": true,
-      "strength": 0.541,
+      "strength": 0.544,
       "evidence": [
-        "89.9% of 'order_id' values are tool-chained"
+        "91.7% of 'order_id' values are tool-chained"
       ]
     },
     "grounding": {
       "required": true,
-      "strength": 0.852,
+      "strength": 0.867,
       "evidence": [
-        "85.2% of 'item_ids' values require grounding (peak arg, 88 instances)",
-        "global grounding_strength=0.151 (diluted by high-volume zero-grounding args)"
+        "86.7% of 'new_item_ids' values require grounding (peak arg, 30 instances)",
+        "global grounding_strength=0.133 (diluted by high-volume zero-grounding args)"
       ]
     },
     "readiness": {
       "required": true,
-      "strength": 0.433,
+      "strength": 0.425,
       "evidence": [
-        "write actions comprise 26 of 60 failures",
+        "write actions comprise 20 of 47 failures",
         "write_fraction=0.19"
       ]
     },
     "deep_planning": {
       "required": true,
-      "strength": 0.608,
+      "strength": 0.508,
       "evidence": [
-        "avg chain depth is 3.04 across tools"
+        "avg chain depth is 2.54 across tools"
       ]
     }
   },
-  "confidence": 0.609
+  "confidence": 0.586,
+  "experimental_boundary": {
+    "artifact_type": "design",
+    "data_scope": "train_only",
+    "allowed_to_influence_graph": true
+  },
+  "derived_from_report": "/Users/gaddy/dev_ai/cognitive-tool-agent/reports/cognitive_dataset_report.json"
 }

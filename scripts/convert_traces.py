@@ -59,16 +59,33 @@ def main() -> None:
     console.print(table)
 
     console.print("\n[bold]Output files:[/bold]")
-    for fname in [
+    core_files = [
         "tool_registry.json",
         "action_sequence.jsonl",
         "turn_supervision.jsonl",
         "failure_rows.jsonl",
         "conversion_summary.json",
-    ]:
+    ]
+    split_files = [
+        "simulation_profiles.jsonl",
+        "scenario_distribution.json",
+        "split_manifest.json",
+        "splits/train_supervision.jsonl",
+        "splits/dev_supervision.jsonl",
+        "splits/test_supervision.jsonl",
+        "splits/train_simulation_ids.json",
+        "splits/dev_simulation_ids.json",
+        "splits/test_simulation_ids.json",
+    ]
+    for fname in core_files:
         fpath = out_dir / fname
         size = fpath.stat().st_size if fpath.exists() else 0
         console.print(f"  [green]{fpath}[/green]  ({size:,} bytes)")
+    console.print("\n[bold]Split artifacts:[/bold]")
+    for fname in split_files:
+        fpath = out_dir / fname
+        size = fpath.stat().st_size if fpath.exists() else 0
+        console.print(f"  [cyan]{fpath}[/cyan]  ({size:,} bytes)")
 
 
 if __name__ == "__main__":

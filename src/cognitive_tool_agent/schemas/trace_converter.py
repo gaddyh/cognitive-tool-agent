@@ -46,6 +46,12 @@ class TurnSupervisionRow(BaseModel):
     role: str
     content: str | None = None
     cognitive_label: CognitiveLabel
+    split: str | None = None
+    scenario_type: str | None = None
+    primary_scenario: str | None = None
+    is_multi_action: bool | None = None
+    requires_grounding: bool | None = None
+    difficulty_bucket: str | None = None
 
 
 class FailureRow(BaseModel):

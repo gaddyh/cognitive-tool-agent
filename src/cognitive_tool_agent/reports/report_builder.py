@@ -30,12 +30,13 @@ class ReportBuilder:
         out_dir: Path | str,
         reports_dir: Path | str,
         source_label: str = "",
+        train_only: bool = True,
     ) -> dict[str, Any]:
         out_dir = Path(out_dir)
         reports_dir = Path(reports_dir)
         reports_dir.mkdir(parents=True, exist_ok=True)
 
-        data = load_reports_data(out_dir)
+        data = load_reports_data(out_dir, train_only=train_only)
 
         summary = compute_extended_summary(data)
         burden = compute_cognitive_burden(data)
@@ -44,9 +45,21 @@ class ReportBuilder:
 
         generated_at = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
+        if train_only and data.get("_train_sim_count") is not None:
+            effective_source = source_label or f"train split ({data['_train_sim_count']} sims)"
+            data_scope = "train_only"
+        else:
+            effective_source = source_label or str(out_dir)
+            data_scope = "all_splits"
+
         full_report: dict[str, Any] = {
             "generated_at": generated_at,
-            "source": source_label or str(out_dir),
+            "source": effective_source,
+            "experimental_boundary": {
+                "artifact_type": "design",
+                "data_scope": data_scope,
+                "allowed_to_influence_graph": True,
+            },
             "dataset_summary": summary,
             "cognitive_action_topology": list(burden.values()),
             "argument_emergence": emergence,

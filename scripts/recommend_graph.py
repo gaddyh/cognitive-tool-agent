@@ -101,8 +101,15 @@ def main() -> None:
 
     # ── Write output ─────────────────────────────────────────────────────────
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    output = recommendation.model_dump()
+    output["experimental_boundary"] = {
+        "artifact_type": "design",
+        "data_scope": "train_only",
+        "allowed_to_influence_graph": True,
+    }
+    output["derived_from_report"] = str(report_path.resolve())
     with out_path.open("w", encoding="utf-8") as fh:
-        json.dump(recommendation.model_dump(), fh, indent=2, ensure_ascii=False)
+        json.dump(output, fh, indent=2, ensure_ascii=False)
 
     md_path = out_path.with_suffix(".md")
     _write_markdown(md_path, inference, recommendation, report_path)

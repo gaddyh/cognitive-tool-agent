@@ -26,6 +26,10 @@ def main() -> None:
     parser.add_argument("--out-dir", default="data/out", help="Converter output directory")
     parser.add_argument("--reports-dir", default="reports", help="Destination for report files")
     parser.add_argument("--source", default="", help="Optional label for the source dataset")
+    parser.add_argument(
+        "--train-only", default=True, action=argparse.BooleanOptionalAction,
+        help="Restrict behavioral data to train split (default: True). Use --no-train-only for full-dataset inspection.",
+    )
     args = parser.parse_args()
 
     out_dir = Path(args.out_dir)
@@ -35,15 +39,24 @@ def main() -> None:
         console.print(f"[red]Output directory not found: {out_dir}[/red]")
         sys.exit(1)
 
+    if not args.train_only:
+        console.print(Panel.fit(
+            "[bold red]WARNING: full-dataset inspection mode.[/bold red]\n"
+            "[red]This report must not be used for graph recommendation or optimization claims.[/red]",
+            border_style="red",
+        ))
+
+    scope_label = "[yellow]TRAIN ONLY[/yellow]" if args.train_only else "[red]ALL SPLITS (inspection)[/red]"
     console.print(Panel.fit(
         f"[bold cyan]Cognitive Dataset Report Builder[/bold cyan]\n"
         f"Input:   [green]{out_dir}[/green]\n"
-        f"Reports: [green]{reports_dir}[/green]",
+        f"Reports: [green]{reports_dir}[/green]\n"
+        f"Scope:   {scope_label}",
         border_style="cyan",
     ))
 
     builder = ReportBuilder()
-    report = builder.run(out_dir, reports_dir, source_label=args.source)
+    report = builder.run(out_dir, reports_dir, source_label=args.source, train_only=args.train_only)
 
     summary = report["dataset_summary"]
     console.print("\n[bold]Dataset Summary (extended)[/bold]")

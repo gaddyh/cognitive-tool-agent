@@ -55,9 +55,22 @@ class RewardInfo(BaseModel):
     action_checks: list[ActionCheck] = []
 
 
+class UserInstructions(BaseModel):
+    domain: str | None = None
+    reason_for_call: str | None = None
+    known_info: str | None = None
+    unknown_info: str | None = None
+    task_instructions: str | None = None
+
+
+class UserScenario(BaseModel):
+    instructions: UserInstructions | None = None
+
+
 class RawTask(BaseModel):
     id: str
     evaluation_criteria: dict[str, Any] = {}
+    user_scenario: UserScenario | None = None
 
     def expected_actions(self) -> list[ExpectedAction]:
         raw = self.evaluation_criteria.get("actions", [])

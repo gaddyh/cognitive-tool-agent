@@ -1,0 +1,309 @@
+{
+  "overall": {
+    "scenario_type": {
+      "calculate|multi_action": 1,
+      "cancel|multi_action": 4,
+      "cancel|single_action": 6,
+      "exchange|multi_action": 3,
+      "exchange|single_action": 19,
+      "lookup_only|single_action": 7,
+      "modify_address|multi_action": 2,
+      "modify_address|single_action": 2,
+      "modify_order_items|multi_action": 14,
+      "modify_order_items|single_action": 10,
+      "modify_pending_order_payment|single_action": 1,
+      "return|multi_action": 7,
+      "return|single_action": 15,
+      "transfer|multi_action": 1,
+      "transfer|single_action": 3,
+      "update_address|multi_action": 2,
+      "update_address|single_action": 3
+    },
+    "primary_scenario": {
+      "calculate": 1,
+      "cancel": 10,
+      "exchange": 22,
+      "lookup_only": 7,
+      "modify_address": 4,
+      "modify_order_items": 24,
+      "modify_pending_order_payment": 1,
+      "return": 22,
+      "transfer": 4,
+      "update_address": 5
+    },
+    "terminal_tool_fingerprint": {
+      "calculate+cancel_pending_order": 1,
+      "calculate+cancel_pending_order+return_delivered_order_items": 1,
+      "calculate+exchange_delivered_order_items": 2,
+      "calculate+get_item_details+modify_pending_order_items": 1,
+      "calculate+modify_pending_order_items": 3,
+      "calculate+return_delivered_order_items": 3,
+      "cancel_pending_order": 6,
+      "cancel_pending_order+exchange_delivered_order_items": 1,
+      "cancel_pending_order+modify_pending_order_address": 1,
+      "cancel_pending_order+modify_pending_order_address+modify_pending_order_items": 1,
+      "cancel_pending_order+modify_pending_order_items": 1,
+      "cancel_pending_order+return_delivered_order_items": 5,
+      "exchange_delivered_order_items": 19,
+      "exchange_delivered_order_items+modify_pending_order_items": 2,
+      "exchange_delivered_order_items+return_delivered_order_items": 1,
+      "modify_pending_order_address": 2,
+      "modify_pending_order_address+modify_pending_order_items": 4,
+      "modify_pending_order_address+modify_pending_order_items+modify_user_address": 2,
+      "modify_pending_order_address+modify_user_address": 2,
+      "modify_pending_order_items": 10,
+      "modify_pending_order_items+modify_user_address": 1,
+      "modify_pending_order_items+return_delivered_order_items": 1,
+      "modify_pending_order_payment": 1,
+      "modify_user_address": 3,
+      "none": 7,
+      "return_delivered_order_items": 15,
+      "return_delivered_order_items+transfer_to_human_agents": 1,
+      "transfer_to_human_agents": 3
+    },
+    "difficulty_bucket": {
+      "easy": 3,
+      "hard": 74,
+      "medium": 23
+    },
+    "requires_grounding": {
+      "False": 3,
+      "True": 97
+    },
+    "requires_tool_chaining": {
+      "False": 31,
+      "True": 69
+    },
+    "has_item_ids": {
+      "False": 26,
+      "True": 74
+    },
+    "has_order_id": {
+      "False": 3,
+      "True": 97
+    },
+    "has_product_id": {
+      "False": 66,
+      "True": 34
+    },
+    "is_multi_action": {
+      "False": 66,
+      "True": 34
+    }
+  },
+  "by_split": {
+    "train": {
+      "scenario_type": {
+        "calculate|multi_action": 1,
+        "cancel|multi_action": 2,
+        "cancel|single_action": 4,
+        "exchange|multi_action": 2,
+        "exchange|single_action": 11,
+        "lookup_only|single_action": 5,
+        "modify_address|multi_action": 2,
+        "modify_address|single_action": 2,
+        "modify_order_items|multi_action": 8,
+        "modify_order_items|single_action": 6,
+        "modify_pending_order_payment|single_action": 1,
+        "return|multi_action": 4,
+        "return|single_action": 9,
+        "transfer|multi_action": 1,
+        "update_address|multi_action": 2,
+        "update_address|single_action": 2
+      },
+      "primary_scenario": {
+        "calculate": 1,
+        "cancel": 6,
+        "exchange": 13,
+        "lookup_only": 5,
+        "modify_address": 4,
+        "modify_order_items": 14,
+        "modify_pending_order_payment": 1,
+        "return": 13,
+        "transfer": 1,
+        "update_address": 4
+      },
+      "terminal_tool_fingerprint": {
+        "calculate+cancel_pending_order": 1,
+        "calculate+exchange_delivered_order_items": 2,
+        "calculate+get_item_details+modify_pending_order_items": 1,
+        "calculate+modify_pending_order_items": 1,
+        "calculate+return_delivered_order_items": 3,
+        "cancel_pending_order": 4,
+        "cancel_pending_order+modify_pending_order_address": 1,
+        "cancel_pending_order+modify_pending_order_address+modify_pending_order_items": 1,
+        "cancel_pending_order+return_delivered_order_items": 2,
+        "exchange_delivered_order_items": 11,
+        "exchange_delivered_order_items+modify_pending_order_items": 1,
+        "modify_pending_order_address": 2,
+        "modify_pending_order_address+modify_pending_order_items": 4,
+        "modify_pending_order_address+modify_pending_order_items+modify_user_address": 1,
+        "modify_pending_order_address+modify_user_address": 2,
+        "modify_pending_order_items": 6,
+        "modify_pending_order_items+modify_user_address": 1,
+        "modify_pending_order_payment": 1,
+        "modify_user_address": 2,
+        "none": 5,
+        "return_delivered_order_items": 9,
+        "return_delivered_order_items+transfer_to_human_agents": 1
+      },
+      "difficulty_bucket": {
+        "easy": 2,
+        "hard": 44,
+        "medium": 16
+      },
+      "requires_grounding": {
+        "False": 2,
+        "True": 60
+      },
+      "requires_tool_chaining": {
+        "False": 21,
+        "True": 41
+      },
+      "has_item_ids": {
+        "False": 18,
+        "True": 44
+      },
+      "has_order_id": {
+        "False": 2,
+        "True": 60
+      },
+      "has_product_id": {
+        "False": 42,
+        "True": 20
+      },
+      "is_multi_action": {
+        "False": 40,
+        "True": 22
+      }
+    },
+    "dev": {
+      "scenario_type": {
+        "cancel|multi_action": 1,
+        "cancel|single_action": 1,
+        "exchange|multi_action": 1,
+        "exchange|single_action": 4,
+        "lookup_only|single_action": 1,
+        "modify_order_items|multi_action": 3,
+        "modify_order_items|single_action": 2,
+        "return|multi_action": 1,
+        "return|single_action": 3,
+        "transfer|single_action": 2,
+        "update_address|single_action": 1
+      },
+      "primary_scenario": {
+        "cancel": 2,
+        "exchange": 5,
+        "lookup_only": 1,
+        "modify_order_items": 5,
+        "return": 4,
+        "transfer": 2,
+        "update_address": 1
+      },
+      "terminal_tool_fingerprint": {
+        "calculate+modify_pending_order_items": 1,
+        "cancel_pending_order": 1,
+        "cancel_pending_order+exchange_delivered_order_items": 1,
+        "cancel_pending_order+modify_pending_order_items": 1,
+        "cancel_pending_order+return_delivered_order_items": 1,
+        "exchange_delivered_order_items": 4,
+        "exchange_delivered_order_items+modify_pending_order_items": 1,
+        "exchange_delivered_order_items+return_delivered_order_items": 1,
+        "modify_pending_order_items": 2,
+        "modify_user_address": 1,
+        "none": 1,
+        "return_delivered_order_items": 3,
+        "transfer_to_human_agents": 2
+      },
+      "difficulty_bucket": {
+        "hard": 15,
+        "medium": 5
+      },
+      "requires_grounding": {
+        "True": 20
+      },
+      "requires_tool_chaining": {
+        "False": 5,
+        "True": 15
+      },
+      "has_item_ids": {
+        "False": 5,
+        "True": 15
+      },
+      "has_order_id": {
+        "True": 20
+      },
+      "has_product_id": {
+        "False": 14,
+        "True": 6
+      },
+      "is_multi_action": {
+        "False": 14,
+        "True": 6
+      }
+    },
+    "test": {
+      "scenario_type": {
+        "cancel|multi_action": 1,
+        "cancel|single_action": 1,
+        "exchange|single_action": 4,
+        "lookup_only|single_action": 1,
+        "modify_order_items|multi_action": 3,
+        "modify_order_items|single_action": 2,
+        "return|multi_action": 2,
+        "return|single_action": 3,
+        "transfer|single_action": 1
+      },
+      "primary_scenario": {
+        "cancel": 2,
+        "exchange": 4,
+        "lookup_only": 1,
+        "modify_order_items": 5,
+        "return": 5,
+        "transfer": 1
+      },
+      "terminal_tool_fingerprint": {
+        "calculate+cancel_pending_order+return_delivered_order_items": 1,
+        "calculate+modify_pending_order_items": 1,
+        "cancel_pending_order": 1,
+        "cancel_pending_order+return_delivered_order_items": 2,
+        "exchange_delivered_order_items": 4,
+        "modify_pending_order_address+modify_pending_order_items+modify_user_address": 1,
+        "modify_pending_order_items": 2,
+        "modify_pending_order_items+return_delivered_order_items": 1,
+        "none": 1,
+        "return_delivered_order_items": 3,
+        "transfer_to_human_agents": 1
+      },
+      "difficulty_bucket": {
+        "easy": 1,
+        "hard": 15,
+        "medium": 2
+      },
+      "requires_grounding": {
+        "False": 1,
+        "True": 17
+      },
+      "requires_tool_chaining": {
+        "False": 5,
+        "True": 13
+      },
+      "has_item_ids": {
+        "False": 3,
+        "True": 15
+      },
+      "has_order_id": {
+        "False": 1,
+        "True": 17
+      },
+      "has_product_id": {
+        "False": 10,
+        "True": 8
+      },
+      "is_multi_action": {
+        "False": 12,
+        "True": 6
+      }
+    }
+  }
+}
