@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from ..adapters.base import AgentMode, ModelAdapter
+from ..graph.node_input import NodeInput
 from ..schemas.common import Confidence, Evidence, UserInput
 from ..schemas.perceive import MentionedEntity, PerceptionResult, RawFieldCandidate
 from ._stub_heuristics import TOOL_KEYWORDS, extract_order_id, is_address_like
@@ -13,14 +14,16 @@ class PerceiveAgent:
         self.mode = mode
         self._adapter = model_adapter
 
-    def run(self, user_input: UserInput) -> PerceptionResult:
+    def run(self, ctx: NodeInput) -> PerceptionResult:
+        user_input = ctx.user_input
         if self.mode == "llm":
-            return self._run_llm(user_input)
+            return self._run_llm(ctx)
         if self.mode == "oracle":
-            return self._run_oracle(user_input)
-        return self._run_stub(user_input)
+            return self._run_oracle(ctx)
+        return self._run_stub(ctx)
 
-    def _run_stub(self, user_input: UserInput) -> PerceptionResult:
+    def _run_stub(self, ctx: NodeInput) -> PerceptionResult:
+        user_input = ctx.user_input
         msg = user_input.message.lower()
         tool_names = [t.name for t in user_input.available_tools]
 
@@ -85,8 +88,8 @@ class PerceiveAgent:
             evidence=evidence,
         )
 
-    def _run_llm(self, user_input: UserInput) -> PerceptionResult:
+    def _run_llm(self, ctx: NodeInput) -> PerceptionResult:
         raise NotImplementedError("llm mode not yet implemented for PerceiveAgent")
 
-    def _run_oracle(self, user_input: UserInput) -> PerceptionResult:
+    def _run_oracle(self, ctx: NodeInput) -> PerceptionResult:
         raise NotImplementedError("oracle mode not yet implemented for PerceiveAgent")

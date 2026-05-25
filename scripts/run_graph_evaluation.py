@@ -98,8 +98,6 @@ def main() -> None:
     advisor = GraphRevisionAdvisor()
     revision_report = advisor.advise(eval_report, inference)
 
-    eval_report.revision_suggestions = [s.suggestion for s in revision_report.suggestions]
-
     _print_revision_suggestions(revision_report)
 
     out_dir.mkdir(parents=True, exist_ok=True)

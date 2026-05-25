@@ -5,16 +5,16 @@ from collections import Counter
 from pathlib import Path
 
 from ..evals.evaluator import Evaluator
-from ..graph.cognitive_graph import GraphExecutor, NodeConfig
+from ..graph.cognitive_graph import GraphExecutor
 from ..graph_builder.failure_analyzer import FailureAnalyzer
 from ..graph_builder.graph_candidate_generator import (
-    _make_monolithic,
-    _make_perceive_plan_act,
+    make_monolithic_baseline,
+    make_perceive_plan_act,
 )
 from ..graph_runner.dataset_adapter import ActionSequenceAdapter
 from ..graph_runner.trace_writer import TraceWriter
+from ..schemas.experiment import ExperimentSpec, NodeRuntimeConfig
 from ..schemas.graph_runner import GraphEvaluationReport, GraphEvaluationRow, GraphRunResult
-from ..schemas.graph_spec import GraphSpec
 from ..schemas.recommender import RecommendedGraph
 from ..tools.registry import ToolRegistry
 
@@ -45,22 +45,37 @@ class GraphEvaluationRunner:
         )
         recommended = _load_recommended_graph(recommended_graph_path)
 
-        run_configs = [
-            ("monolithic", _make_monolithic().graph_spec, "n/a"),
-            ("minimal", _make_perceive_plan_act().graph_spec, "n/a"),
-            ("recommended_stub", recommended.graph_spec, "stub"),
-            ("recommended_oracle", recommended.graph_spec, "oracle"),
+        monolithic_graph = make_monolithic_baseline().graph_spec
+        minimal_graph = make_perceive_plan_act().graph_spec
+        recommended_graph = recommended.graph_spec
+
+        experiments: list[tuple[str, ExperimentSpec, str]] = [
+            ("monolithic", ExperimentSpec(graph=monolithic_graph), "n/a"),
+            ("minimal", ExperimentSpec(graph=minimal_graph), "n/a"),
+            (
+                "recommended_stub",
+                ExperimentSpec(
+                    graph=recommended_graph,
+                    runtime=[NodeRuntimeConfig(node_id="grounding", mode="stub")],
+                ),
+                "stub",
+            ),
+            (
+                "recommended_oracle",
+                ExperimentSpec(
+                    graph=recommended_graph,
+                    runtime=[NodeRuntimeConfig(node_id="grounding", mode="oracle")],
+                ),
+                "oracle",
+            ),
         ]
 
+        executor = GraphExecutor()
         results: list[GraphEvaluationRow] = []
         run_results: list[GraphRunResult] = []
 
-        for graph_id, graph_spec, grounding_mode in run_configs:
-            grounding_node_mode = grounding_mode if grounding_mode != "n/a" else "disabled"
-            executor = GraphExecutor(
-                node_configs={"grounding": NodeConfig(mode=grounding_node_mode)}
-            )
-            traces = [executor.run(graph_spec, row, registry) for row in rows]
+        for graph_id, experiment, grounding_mode in experiments:
+            traces = [executor.run(experiment, row, registry) for row in rows]
 
             traces_path = out_dir / f"graph_traces_{graph_id}.jsonl"
             self._trace_writer.write(traces, traces_path)
@@ -86,7 +101,7 @@ class GraphEvaluationRunner:
             results.append(
                 GraphEvaluationRow(
                     graph_id=graph_id,
-                    node_count=len(graph_spec.nodes),
+                    node_count=len(experiment.graph.nodes),
                     end_to_end_success=scores["end_to_end_success"],
                     tool_name_accuracy=scores["tool_name_accuracy"],
                     argument_exact_match=scores["argument_exact_match"],

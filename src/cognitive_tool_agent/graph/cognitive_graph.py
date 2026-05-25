@@ -1,13 +1,25 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+
 from typing import Any
 
-from ..adapters.base import AgentMode, ModelAdapter
+from ..adapters.base import ModelAdapter
+from ..agents.act_agent import ActAgent
+from ..agents.grounding_agent import GroundingAgent
+from ..agents.learn_agent import LearnAgent
+from ..agents.perceive_agent import PerceiveAgent
+from ..agents.plan_agent import PlanAgent
+from ..agents.readiness_agent import ReadinessAgent
+from ..agents.reason_agent import ReasonAgent
+from .node_input import NodeInput
+from .wiring_validator import WiringError, validate_wiring
 from ..schemas.common import UserInput
 from ..schemas.dataset import DatasetRow
+from ..schemas.experiment import ExperimentSpec, NodeRuntimeConfig
 from ..schemas.graph_spec import EdgeSpec, GraphSpec, NodeSpec, NodeRole  # noqa: F401
 from ..schemas.grounding import GroundingResult
+from ..schemas.node_io import ROLE_INPUTS, ROLE_OUTPUT
 from ..schemas.perceive import PerceptionResult
 from ..schemas.reason import ReasoningResult
 from ..schemas.readiness import ReadinessResult
@@ -17,19 +29,22 @@ from ..schemas.learn import LearningResult
 from ..schemas.trace import CognitiveTrace
 from ..tools.registry import ToolRegistry
 
-
-@dataclass
-class NodeConfig:
-    """Per-node execution configuration injected into GraphExecutor."""
-
-    mode: AgentMode = "stub"
-    model_adapter: ModelAdapter | None = None
+_ROLE_TO_AGENT: dict[str, type] = {
+    "perceive":  PerceiveAgent,
+    "reason":    ReasonAgent,
+    "readiness": ReadinessAgent,
+    "grounding": GroundingAgent,
+    "plan":      PlanAgent,
+    "act":       ActAgent,
+    "learn":     LearnAgent,
+}
 
 
 @dataclass
 class RunContext:
     row: DatasetRow
     registry: ToolRegistry
+    user_input: UserInput
     perception: PerceptionResult | None = None
     reasoning: ReasoningResult | None = None
     grounding: GroundingResult | None = None
@@ -39,9 +54,8 @@ class RunContext:
     learning: LearningResult | None = None
 
     def to_trace(self) -> CognitiveTrace:
-        user_input = _row_to_user_input(self.row, self.registry)
         return CognitiveTrace(
-            input=user_input,
+            input=self.user_input,
             perception=self.perception,
             reasoning=self.reasoning,
             grounding=self.grounding,
@@ -68,92 +82,116 @@ def _row_to_user_input(row: DatasetRow, registry: ToolRegistry) -> UserInput:
 
 class GraphExecutor:
     """
-    Node-driven executor.  Iterates GraphSpec.nodes in topological order and
-    dispatches each node to the agent registered for its role.  No cognitive
-    stages are hardcoded; the graph definition fully controls execution.
+    Node-driven executor.  Accepts an ExperimentSpec (topology + per-node
+    execution config) and iterates nodes in topological order.
+
+    Nodes absent from ExperimentSpec.runtime default to mode='stub' with no
+    adapter.  The runtime config is keyed by node_id (not role) so graphs
+    with multiple nodes sharing a role remain unambiguous.
     """
 
-    def __init__(self, node_configs: dict[NodeRole, NodeConfig] | None = None) -> None:
-        from ..agents.perceive_agent import PerceiveAgent
-        from ..agents.reason_agent import ReasonAgent
-        from ..agents.grounding_agent import GroundingAgent
-        from ..agents.readiness_agent import ReadinessAgent
-        from ..agents.plan_agent import PlanAgent
-        from ..agents.act_agent import ActAgent
-        from ..agents.learn_agent import LearnAgent
+    def __init__(self, model_adapters: dict[str, ModelAdapter] | None = None) -> None:
+        # Maps adapter hint string (e.g. "openai:gpt-4.1") to a resolved
+        # ModelAdapter object.  Empty until real adapters are wired.
+        self._model_adapters: dict[str, ModelAdapter] = model_adapters or {}
 
-        cfg: dict[NodeRole, NodeConfig] = node_configs or {}
-        default = NodeConfig()
+    def run(
+        self,
+        experiment: ExperimentSpec,
+        row: DatasetRow,
+        registry: ToolRegistry,
+    ) -> CognitiveTrace:
+        # Guard: typo'd node_id in runtime config silently falls to stub mode,
+        # making an oracle experiment look like a stub run (oracle gap = zero).
+        graph_node_ids = {n.id for n in experiment.graph.nodes}
+        runtime_map = experiment.runtime_map()
+        unknown_ids = set(runtime_map) - graph_node_ids
+        if unknown_ids:
+            raise ValueError(
+                f"ExperimentSpec.runtime references node_ids not present in graph "
+                f"'{experiment.graph.id}': {sorted(unknown_ids)}"
+            )
 
-        def _cfg(role: NodeRole) -> NodeConfig:
-            return cfg.get(role, default)
+        user_input = _row_to_user_input(row, registry)
 
-        self._perceive = PerceiveAgent(mode=_cfg("perceive").mode, model_adapter=_cfg("perceive").model_adapter)
-        self._reason = ReasonAgent(mode=_cfg("reason").mode, model_adapter=_cfg("reason").model_adapter)
-        self._grounding = GroundingAgent(mode=_cfg("grounding").mode)
-        self._readiness = ReadinessAgent(mode=_cfg("readiness").mode, model_adapter=_cfg("readiness").model_adapter)
-        self._plan = PlanAgent(mode=_cfg("plan").mode, model_adapter=_cfg("plan").model_adapter)
-        self._act = ActAgent(mode=_cfg("act").mode, model_adapter=_cfg("act").model_adapter)
-        self._learn = LearnAgent(mode=_cfg("learn").mode, model_adapter=_cfg("learn").model_adapter)
+        report = validate_wiring(experiment.graph)
+        if not report.ok:
+            raise WiringError(
+                f"Graph '{experiment.graph.id}' has wiring errors:\n"
+                + "\n".join(f"  - {e}" for e in report.errors)
+            )
 
-    def run(self, graph_spec: GraphSpec, row: DatasetRow, registry: ToolRegistry) -> CognitiveTrace:
-        ctx = RunContext(row=row, registry=registry)
-        ordered_nodes = graph_spec.topological_order()
+        ctx = RunContext(row=row, registry=registry, user_input=user_input)
+        ordered_nodes = experiment.graph.topological_order()
 
         for node in ordered_nodes:
-            self._dispatch(node, ctx)
+            node_cfg = runtime_map.get(node.id, NodeRuntimeConfig(node_id=node.id))
+            self._dispatch(node, ctx, node_cfg, experiment.graph)
 
         return ctx.to_trace()
 
-    def _dispatch(self, node: NodeSpec, ctx: RunContext) -> None:
-        role = node.role
-        user_input = _row_to_user_input(ctx.row, ctx.registry)
-
-        if role == "perceive":
-            ctx.perception = self._perceive.run(user_input)
-
-        elif role == "reason":
-            ctx.reasoning = self._reason.run(user_input, ctx.perception)
-
-        elif role == "readiness":
-            ctx.readiness = self._readiness.run(user_input, ctx.reasoning, ctx.registry)
-
-        elif role == "plan":
-            ctx.plan = self._plan.run(user_input, ctx.reasoning, ctx.readiness)
-
-        elif role == "act":
-            ctx.action = self._act.run(ctx.plan, ctx.registry)
-
-        elif role == "learn":
-            ctx.learning = self._learn.run(user_input, ctx.to_trace())
-
-        elif role == "monolithic":
-            ctx.plan, ctx.action = _run_monolithic(user_input, ctx.registry, self._plan, self._act)
-
-        elif role == "grounding":
-            ctx.grounding = self._grounding.run(user_input, ctx.reasoning, ctx.row)
-
-        elif role == "memory":
-            raise NotImplementedError(
-                "Node role 'memory' is recommender-only in v1. "
-                "GraphRecommender maps memory capability to 'learn' node, not 'memory'. "
-                "If you see this error, a graph was hand-crafted with a 'memory' node."
-            )
-
-        else:
+    def _make_agent(
+        self, role: str, cfg: NodeRuntimeConfig
+    ) -> PerceiveAgent | ReasonAgent | ReadinessAgent | GroundingAgent | PlanAgent | ActAgent | LearnAgent:
+        agent_cls = _ROLE_TO_AGENT.get(role)
+        if agent_cls is None:
+            if role == "monolithic":
+                raise NotImplementedError(
+                    "Node role 'monolithic' is deprecated. "
+                    "Express the baseline as a two-node graph: plan → act with no upstream edges. "
+                    "See graph_candidate_generator.make_monolithic_baseline() for the canonical form."
+                )
+            if role == "memory":
+                raise NotImplementedError(
+                    "Node role 'memory' is recommender-only in v1. "
+                    "GraphRecommender maps memory capability to 'learn' node, not 'memory'. "
+                    "If you see this error, a graph was hand-crafted with a 'memory' node."
+                )
             raise ValueError(f"Unknown node role: {role!r}")
+        model_adapter = self._model_adapters.get(cfg.adapter) if cfg.adapter else None
+        return agent_cls(mode=cfg.mode, model_adapter=model_adapter)
 
+    def _build_node_input(
+        self, node: NodeSpec, ctx: RunContext, graph: GraphSpec
+    ) -> NodeInput:
+        """Gather edge-supplied slots for this node from RunContext.
 
-def _run_monolithic(
-    user_input: UserInput,
-    registry: ToolRegistry,
-    plan_agent: Any,
-    act_agent: Any,
-) -> tuple[PlanResult, ActionResult]:
-    """
-    Monolithic baseline: direct keyword → tool mapping, no cognitive stages.
-    Uses the executor's own injected agents so baseline and pipeline share config.
-    """
-    plan = plan_agent.run(user_input, reasoning=None, readiness=None)
-    action = act_agent.run(plan, registry)
-    return plan, action
+        Only slots listed in ROLE_INPUTS[node.role] are included — ordering-only
+        edges (e.g. act→learn) are skipped silently.  The validator at run()
+        entry is the first line of defense against mis-wired ordering edges;
+        this skip is never the only check.
+
+        learn invariant: trace_so_far is never edge-supplied.  It is always
+        computed from RunContext.to_trace() after all prior nodes have written
+        their results.  ROLE_INPUTS['learn'] is empty, so no incoming edge
+        can pass the slot guard below.
+        """
+        supplied: dict[str, Any] = {}
+        role_inputs = ROLE_INPUTS.get(node.role, {})
+        for edge in graph.edges:
+            if edge.to_node == node.id:
+                slot = edge.provides or ROLE_OUTPUT.get(
+                    graph.node_map[edge.from_node].role
+                )
+                if slot and slot in role_inputs:
+                    supplied[slot] = getattr(ctx, slot, None)
+
+        trace_so_far = ctx.to_trace() if node.role == "learn" else None
+
+        return NodeInput(
+            user_input=ctx.user_input,
+            registry=ctx.registry,
+            row=ctx.row,
+            trace_so_far=trace_so_far,
+            **supplied,
+        )
+
+    def _dispatch(
+        self, node: NodeSpec, ctx: RunContext, cfg: NodeRuntimeConfig, graph: GraphSpec
+    ) -> None:
+        node_input = self._build_node_input(node, ctx, graph)
+        agent = self._make_agent(node.role, cfg)
+        result = agent.run(node_input)
+        output_slot = ROLE_OUTPUT.get(node.role)
+        if output_slot:
+            setattr(ctx, output_slot, result)

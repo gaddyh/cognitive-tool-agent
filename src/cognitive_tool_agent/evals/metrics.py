@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from ..schemas.act import NEXT_ACTION_TO_ACTION_TYPE
 from ..schemas.dataset import DatasetRow
 from ..schemas.trace import CognitiveTrace
 
@@ -78,11 +79,4 @@ def stage_failure_rate(
 
 
 def _action_type_matches(actual_type: str, expected_action: str) -> bool:
-    mapping = {
-        "execute_tool": "tool_executed",
-        "ask_followup": "followup_asked",
-        "answer_directly": "answered_directly",
-        "abstain": "abstained",
-        "reject": "rejected",
-    }
-    return actual_type == mapping.get(expected_action, expected_action)
+    return actual_type == NEXT_ACTION_TO_ACTION_TYPE.get(expected_action, expected_action)

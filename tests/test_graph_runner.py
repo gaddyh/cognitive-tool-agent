@@ -186,7 +186,8 @@ def test_adapter_registry_has_required_fields(synthetic_data):
 
 def test_trace_writer_roundtrip(tmp_path):
     from cognitive_tool_agent.graph.cognitive_graph import GraphExecutor
-    from cognitive_tool_agent.graph_builder.graph_candidate_generator import _make_monolithic
+    from cognitive_tool_agent.graph_builder.graph_candidate_generator import make_monolithic
+    from cognitive_tool_agent.schemas.experiment import ExperimentSpec
     from cognitive_tool_agent.tools.fake_tools import DEFAULT_REGISTRY
     from cognitive_tool_agent.datasets.loader import load_jsonl
 
@@ -194,9 +195,10 @@ def test_trace_writer_roundtrip(tmp_path):
         Path(__file__).parent.parent / "data" / "dev" / "tool_calling_micro.jsonl"
     )
     rows = load_jsonl(micro_path)
-    candidate = _make_monolithic()
+    candidate = make_monolithic()
+    experiment = ExperimentSpec(graph=candidate.graph_spec)
     executor = GraphExecutor()
-    traces = [executor.run(candidate.graph_spec, row, DEFAULT_REGISTRY) for row in rows]
+    traces = [executor.run(experiment, row, DEFAULT_REGISTRY) for row in rows]
 
     out_path = tmp_path / "traces.jsonl"
     writer = TraceWriter()
@@ -271,8 +273,10 @@ def test_graph_evaluation_oracle_confidence_not_below_stub(synthetic_data, tmp_p
 
 def test_grounding_agent_stub_returns_grounding_result():
     from cognitive_tool_agent.agents.grounding_agent import GroundingAgent
+    from cognitive_tool_agent.graph.node_input import NodeInput
     from cognitive_tool_agent.schemas.common import UserInput
     from cognitive_tool_agent.schemas.dataset import DatasetRow, ExpectedBehavior
+    from cognitive_tool_agent.tools.fake_tools import DEFAULT_REGISTRY
 
     agent = GroundingAgent(mode="stub")
     user_input = UserInput(message="Cancel my order", available_tools=[])
@@ -281,15 +285,18 @@ def test_grounding_agent_stub_returns_grounding_result():
         user_message="Cancel my order",
         expected=ExpectedBehavior(expected_action="tool_executed", expected_tool="cancel_order"),
     )
-    result = agent.run(user_input, reasoning=None, row=row)
+    ctx = NodeInput(user_input=user_input, registry=DEFAULT_REGISTRY, row=row)
+    result = agent.run(ctx)
     assert result.grounding_mode == "stub"
     assert 0.0 <= result.grounding_confidence <= 1.0
 
 
 def test_grounding_agent_oracle_uses_expected_args():
     from cognitive_tool_agent.agents.grounding_agent import GroundingAgent
+    from cognitive_tool_agent.graph.node_input import NodeInput
     from cognitive_tool_agent.schemas.common import UserInput
     from cognitive_tool_agent.schemas.dataset import DatasetRow, ExpectedBehavior
+    from cognitive_tool_agent.tools.fake_tools import DEFAULT_REGISTRY
 
     agent = GroundingAgent(mode="oracle")
     user_input = UserInput(message="Cancel order", available_tools=[])
@@ -302,7 +309,8 @@ def test_grounding_agent_oracle_uses_expected_args():
             expected_arguments={"order_id": "#W999"},
         ),
     )
-    result = agent.run(user_input, reasoning=None, row=row)
+    ctx = NodeInput(user_input=user_input, registry=DEFAULT_REGISTRY, row=row)
+    result = agent.run(ctx)
     assert result.grounding_mode == "oracle"
     assert result.resolved_args["order_id"] == "#W999"
     assert result.grounding_confidence == 1.0
@@ -310,8 +318,10 @@ def test_grounding_agent_oracle_uses_expected_args():
 
 def test_grounding_agent_disabled_returns_empty():
     from cognitive_tool_agent.agents.grounding_agent import GroundingAgent
+    from cognitive_tool_agent.graph.node_input import NodeInput
     from cognitive_tool_agent.schemas.common import UserInput
     from cognitive_tool_agent.schemas.dataset import DatasetRow, ExpectedBehavior
+    from cognitive_tool_agent.tools.fake_tools import DEFAULT_REGISTRY
 
     agent = GroundingAgent(mode="disabled")
     user_input = UserInput(message="x", available_tools=[])
@@ -320,13 +330,15 @@ def test_grounding_agent_disabled_returns_empty():
         user_message="x",
         expected=ExpectedBehavior(expected_action="tool_executed"),
     )
-    result = agent.run(user_input, reasoning=None, row=row)
+    ctx = NodeInput(user_input=user_input, registry=DEFAULT_REGISTRY, row=row)
+    result = agent.run(ctx)
     assert result.grounding_mode == "disabled"
     assert result.resolved_args == {}
 
 
 def test_graph_executor_runs_grounding_node():
     from cognitive_tool_agent.graph.cognitive_graph import GraphExecutor
+    from cognitive_tool_agent.schemas.experiment import ExperimentSpec, NodeRuntimeConfig
     from cognitive_tool_agent.schemas.graph_spec import EdgeSpec, GraphSpec, NodeSpec
     from cognitive_tool_agent.schemas.dataset import DatasetRow, ExpectedBehavior
     from cognitive_tool_agent.tools.fake_tools import DEFAULT_REGISTRY
@@ -356,9 +368,12 @@ def test_graph_executor_runs_grounding_node():
             expected_tool="get_order_status",
         ),
     )
-    from cognitive_tool_agent.graph.cognitive_graph import NodeConfig
-    executor = GraphExecutor(node_configs={"grounding": NodeConfig(mode="stub")})
-    trace = executor.run(graph, row, DEFAULT_REGISTRY)
+    experiment = ExperimentSpec(
+        graph=graph,
+        runtime=[NodeRuntimeConfig(node_id="grounding", mode="stub")],
+    )
+    executor = GraphExecutor()
+    trace = executor.run(experiment, row, DEFAULT_REGISTRY)
 
     assert trace.grounding is not None
     assert trace.grounding.grounding_mode == "stub"

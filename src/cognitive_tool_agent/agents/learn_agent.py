@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from ..adapters.base import AgentMode, ModelAdapter
+from ..graph.node_input import NodeInput
 from ..schemas.common import UserInput
 from ..schemas.learn import FailureAnalysis, LearningResult
 from ..schemas.trace import CognitiveTrace
@@ -13,14 +14,15 @@ class LearnAgent:
         self.mode = mode
         self._adapter = model_adapter
 
-    def run(self, user_input: UserInput, trace: CognitiveTrace) -> LearningResult:
+    def run(self, ctx: NodeInput) -> LearningResult:
         if self.mode == "llm":
-            return self._run_llm(user_input, trace)
+            return self._run_llm(ctx)
         if self.mode == "oracle":
-            return self._run_oracle(user_input, trace)
-        return self._run_stub(user_input, trace)
+            return self._run_oracle(ctx)
+        return self._run_stub(ctx)
 
-    def _run_stub(self, user_input: UserInput, trace: CognitiveTrace) -> LearningResult:
+    def _run_stub(self, ctx: NodeInput) -> LearningResult:
+        trace = ctx.trace_so_far
         failed_stage, failure_type, explanation = _diagnose(trace)
 
         overall_success = (
@@ -40,10 +42,10 @@ class LearnAgent:
             optimization_target=failed_stage if failed_stage != "none" else None,
         )
 
-    def _run_llm(self, user_input: UserInput, trace: CognitiveTrace) -> LearningResult:
+    def _run_llm(self, ctx: NodeInput) -> LearningResult:
         raise NotImplementedError("llm mode not yet implemented for LearnAgent")
 
-    def _run_oracle(self, user_input: UserInput, trace: CognitiveTrace) -> LearningResult:
+    def _run_oracle(self, ctx: NodeInput) -> LearningResult:
         raise NotImplementedError("oracle mode not yet implemented for LearnAgent")
 
 

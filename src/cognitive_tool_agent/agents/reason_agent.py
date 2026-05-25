@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from ..adapters.base import AgentMode, ModelAdapter
+from ..graph.node_input import NodeInput
 from ..schemas.common import Confidence, Evidence, UserInput
 from ..schemas.perceive import PerceptionResult
 from ..schemas.reason import MissingRequirement, ReasoningResult, ResolvedEntity
+from ._stub_heuristics import CONFIRMATION_KEYWORDS
 
 
 class ReasonAgent:
@@ -13,22 +15,16 @@ class ReasonAgent:
         self.mode = mode
         self._adapter = model_adapter
 
-    def run(
-        self,
-        user_input: UserInput,
-        perception: PerceptionResult | None,
-    ) -> ReasoningResult:
+    def run(self, ctx: NodeInput) -> ReasoningResult:
         if self.mode == "llm":
-            return self._run_llm(user_input, perception)
+            return self._run_llm(ctx)
         if self.mode == "oracle":
-            return self._run_oracle(user_input, perception)
-        return self._run_stub(user_input, perception)
+            return self._run_oracle(ctx)
+        return self._run_stub(ctx)
 
-    def _run_stub(
-        self,
-        user_input: UserInput,
-        perception: PerceptionResult | None,
-    ) -> ReasoningResult:
+    def _run_stub(self, ctx: NodeInput) -> ReasoningResult:
+        user_input = ctx.user_input
+        perception = ctx.perception
         if perception is None:
             return ReasoningResult(
                 selected_intent=None,
@@ -87,7 +83,7 @@ class ReasonAgent:
             and "pending_confirmation" not in user_input.world_state
             and not any(
                 kw in user_input.message.lower()
-                for kw in ("yes", "confirm", "go ahead", "please cancel")
+                for kw in CONFIRMATION_KEYWORDS
             )
         )
         if needs_confirm:
@@ -112,16 +108,8 @@ class ReasonAgent:
             evidence=evidence,
         )
 
-    def _run_llm(
-        self,
-        user_input: UserInput,
-        perception: PerceptionResult | None,
-    ) -> ReasoningResult:
+    def _run_llm(self, ctx: NodeInput) -> ReasoningResult:
         raise NotImplementedError("llm mode not yet implemented for ReasonAgent")
 
-    def _run_oracle(
-        self,
-        user_input: UserInput,
-        perception: PerceptionResult | None,
-    ) -> ReasoningResult:
+    def _run_oracle(self, ctx: NodeInput) -> ReasoningResult:
         raise NotImplementedError("oracle mode not yet implemented for ReasonAgent")

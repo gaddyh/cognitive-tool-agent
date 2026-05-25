@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..adapters.base import AgentMode, ModelAdapter
+from ..graph.node_input import NodeInput
 from ..schemas.common import Confidence, UserInput
 from ..schemas.reason import ReasoningResult
 from ..schemas.readiness import ReadinessResult
@@ -17,24 +18,17 @@ class PlanAgent:
         self.mode = mode
         self._adapter = model_adapter
 
-    def run(
-        self,
-        user_input: UserInput,
-        reasoning: ReasoningResult | None,
-        readiness: ReadinessResult | None,
-    ) -> PlanResult:
+    def run(self, ctx: NodeInput) -> PlanResult:
         if self.mode == "llm":
-            return self._run_llm(user_input, reasoning, readiness)
+            return self._run_llm(ctx)
         if self.mode == "oracle":
-            return self._run_oracle(user_input, reasoning, readiness)
-        return self._run_stub(user_input, reasoning, readiness)
+            return self._run_oracle(ctx)
+        return self._run_stub(ctx)
 
-    def _run_stub(
-        self,
-        user_input: UserInput,
-        reasoning: ReasoningResult | None,
-        readiness: ReadinessResult | None,
-    ) -> PlanResult:
+    def _run_stub(self, ctx: NodeInput) -> PlanResult:
+        user_input = ctx.user_input
+        reasoning = ctx.reasoning
+        readiness = ctx.readiness
         msg = user_input.message.lower()
         tool_names = [t.name for t in user_input.available_tools]
 
@@ -103,20 +97,10 @@ class PlanAgent:
             confidence=Confidence(score=0.6, reason="monolithic stub keyword match"),
         )
 
-    def _run_llm(
-        self,
-        user_input: UserInput,
-        reasoning: ReasoningResult | None,
-        readiness: ReadinessResult | None,
-    ) -> PlanResult:
+    def _run_llm(self, ctx: NodeInput) -> PlanResult:
         raise NotImplementedError("llm mode not yet implemented for PlanAgent")
 
-    def _run_oracle(
-        self,
-        user_input: UserInput,
-        reasoning: ReasoningResult | None,
-        readiness: ReadinessResult | None,
-    ) -> PlanResult:
+    def _run_oracle(self, ctx: NodeInput) -> PlanResult:
         raise NotImplementedError("oracle mode not yet implemented for PlanAgent")
 
 

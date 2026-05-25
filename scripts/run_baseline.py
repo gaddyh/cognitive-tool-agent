@@ -16,7 +16,8 @@ from rich import box
 
 from cognitive_tool_agent.datasets.loader import load_jsonl
 from cognitive_tool_agent.graph_builder.baseline_runner import BaselineRunner
-from cognitive_tool_agent.graph_builder.graph_candidate_generator import _make_monolithic
+from cognitive_tool_agent.graph_builder.graph_candidate_generator import make_monolithic
+from cognitive_tool_agent.schemas.act import ACTION_TYPE_TO_NEXT_ACTION
 from cognitive_tool_agent.tools.fake_tools import DEFAULT_REGISTRY
 
 
@@ -32,7 +33,7 @@ def main() -> None:
     rows = load_jsonl(path)
     console.print(f"Loaded [bold]{len(rows)}[/bold] rows from [green]{path}[/green]\n")
 
-    candidate = _make_monolithic()
+    candidate = make_monolithic()
     runner = BaselineRunner()
     traces, scores = runner.run(candidate, rows, DEFAULT_REGISTRY)
 
@@ -43,17 +44,9 @@ def main() -> None:
     table.add_column("Tool")
     table.add_column("Pass", justify="center")
 
-    action_map = {
-        "tool_executed": "execute_tool",
-        "followup_asked": "ask_followup",
-        "answered_directly": "answer_directly",
-        "abstained": "abstain",
-        "rejected": "reject",
-    }
-
     for trace, row in zip(traces, rows):
         expected = row.expected.expected_action
-        actual = action_map.get(trace.action.action_type, "?") if trace.action else "none"
+        actual = ACTION_TYPE_TO_NEXT_ACTION.get(trace.action.action_type, "?") if trace.action else "none"
         tool = trace.action.tool_name or "-" if trace.action else "-"
         passed = "[green]✓[/green]" if expected == actual else "[red]✗[/red]"
         table.add_row(row.id, expected, actual, tool, passed)

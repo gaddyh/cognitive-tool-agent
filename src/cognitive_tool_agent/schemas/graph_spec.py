@@ -22,7 +22,6 @@ NodeRole = Literal[
 class NodeSpec(BaseModel):
     id: str
     role: NodeRole
-    model_hint: str = "stub"
     prompt_template: str | None = None
     input_schema: str | None = None
     output_schema: str | None = None
@@ -31,6 +30,7 @@ class NodeSpec(BaseModel):
 class EdgeSpec(BaseModel):
     from_node: str
     to_node: str
+    provides: str | None = None
     condition: str | None = None
 
 
@@ -40,6 +40,10 @@ class GraphSpec(BaseModel):
     edges: list[EdgeSpec] = []
     latency_estimate: float = 1.0
     cost_estimate: float = 1.0
+
+    @property
+    def node_map(self) -> dict[str, NodeSpec]:
+        return {n.id: n for n in self.nodes}
 
     def topological_order(self) -> list[NodeSpec]:
         node_map = {n.id: n for n in self.nodes}

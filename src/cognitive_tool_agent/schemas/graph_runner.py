@@ -27,4 +27,3 @@ class GraphEvaluationReport(BaseModel):
     source_dataset: str
     rows_evaluated: int
     results: list[GraphEvaluationRow]
-    revision_suggestions: list[str] = []

@@ -17,6 +17,8 @@ TOOL_KEYWORDS: dict[str, list[str]] = {
 
 ORDER_ID_PREFIX = "#"
 
+CONFIRMATION_KEYWORDS: tuple[str, ...] = ("yes", "confirm", "go ahead", "please cancel")
+
 
 def extract_order_id(token: str) -> str | None:
     """Return the bare order ID from a token like '#12345', or None if it isn't one."""

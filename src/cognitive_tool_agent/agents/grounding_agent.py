@@ -3,14 +3,14 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from ..adapters.base import AgentMode
+from ..adapters.base import AgentMode, ModelAdapter
+from ..graph.node_input import NodeInput
 from ..schemas.common import UserInput
 from ..schemas.dataset import DatasetRow
 from ..schemas.grounding import GroundingResult
 from ..schemas.reason import ReasoningResult
 
 _ID_PATTERN = re.compile(r"(^|_)(id|ids)$", re.IGNORECASE)
-_WRITE_VERBS = {"modify", "cancel", "exchange", "update", "return", "create", "delete"}
 
 
 def _looks_like_id_field(name: str) -> bool:
@@ -18,28 +18,32 @@ def _looks_like_id_field(name: str) -> bool:
 
 
 class GroundingAgent:
-    def __init__(self, mode: AgentMode = "stub") -> None:
-        self.mode = mode
-
-    def run(
+    def __init__(
         self,
-        user_input: UserInput,
-        reasoning: ReasoningResult | None,
-        row: DatasetRow,
-    ) -> GroundingResult:
+        mode: AgentMode = "stub",
+        model_adapter: ModelAdapter | None = None,
+    ) -> None:
+        self.mode = mode
+        self._adapter = model_adapter
+
+    def run(self, ctx: NodeInput) -> GroundingResult:
         if self.mode == "disabled":
             return GroundingResult(grounding_mode="disabled")
 
         if self.mode == "oracle":
-            return self._run_oracle(row)
+            return self._run_oracle(ctx)
 
-        return self._run_stub(user_input, reasoning)
+        if self.mode == "llm":
+            return self._run_llm(ctx)
 
-    def _run_stub(
-        self,
-        user_input: UserInput,
-        reasoning: ReasoningResult | None,
-    ) -> GroundingResult:
+        return self._run_stub(ctx)
+
+    def _run_llm(self, ctx: NodeInput) -> GroundingResult:
+        raise NotImplementedError("llm mode not yet implemented for GroundingAgent")
+
+    def _run_stub(self, ctx: NodeInput) -> GroundingResult:
+        user_input = ctx.user_input
+        reasoning = ctx.reasoning
         resolved_args: dict[str, Any] = {}
         unresolved_ids: list[str] = []
         candidates_examined = 0
@@ -77,7 +81,8 @@ class GroundingAgent:
             candidates_examined=candidates_examined,
         )
 
-    def _run_oracle(self, row: DatasetRow) -> GroundingResult:
+    def _run_oracle(self, ctx: NodeInput) -> GroundingResult:
+        row = ctx.row
         expected_args: dict[str, Any] = row.expected.expected_arguments or {}
         return GroundingResult(
             grounding_mode="oracle",

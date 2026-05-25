@@ -4,7 +4,7 @@
   "results": [
     {
       "graph_id": "monolithic",
-      "node_count": 1,
+      "node_count": 2,
       "end_to_end_success": 0.0,
       "tool_name_accuracy": 0.0,
       "argument_exact_match": 0.0,
@@ -46,9 +46,5 @@
       "failure_count": 98,
       "grounding_mode": "oracle"
     }
-  ],
-  "revision_suggestions": [
-    "Split grounding node: separate 'item_ids' resolution from general entity grounding. High-frequency ID fields need dedicated lookup chains.",
-    "Recommended graph is not outperforming the minimal graph. This is likely the stub-grounding ceiling. Resolve grounding before concluding that the topology is wrong."
   ]
 }

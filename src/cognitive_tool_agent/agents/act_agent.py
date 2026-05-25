@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from ..adapters.base import AgentMode, ModelAdapter
+from ..graph.node_input import NodeInput
 from ..schemas.act import ActionResult
 from ..schemas.plan import PlanResult
 from ..tools.registry import ToolRegistry
@@ -13,14 +14,16 @@ class ActAgent:
         self.mode = mode
         self._adapter = model_adapter
 
-    def run(self, plan: PlanResult | None, registry: ToolRegistry) -> ActionResult:
+    def run(self, ctx: NodeInput) -> ActionResult:
         if self.mode == "llm":
-            return self._run_llm(plan, registry)
+            return self._run_llm(ctx)
         if self.mode == "oracle":
-            return self._run_oracle(plan, registry)
-        return self._run_stub(plan, registry)
+            return self._run_oracle(ctx)
+        return self._run_stub(ctx)
 
-    def _run_stub(self, plan: PlanResult | None, registry: ToolRegistry) -> ActionResult:
+    def _run_stub(self, ctx: NodeInput) -> ActionResult:
+        plan = ctx.plan
+        registry = ctx.registry
         if plan is None:
             return ActionResult(
                 action_type="abstained",
@@ -92,8 +95,8 @@ class ActAgent:
             error=f"unknown next_action: {next_action!r}",
         )
 
-    def _run_llm(self, plan: PlanResult | None, registry: ToolRegistry) -> ActionResult:
+    def _run_llm(self, ctx: NodeInput) -> ActionResult:
         raise NotImplementedError("llm mode not yet implemented for ActAgent")
 
-    def _run_oracle(self, plan: PlanResult | None, registry: ToolRegistry) -> ActionResult:
+    def _run_oracle(self, ctx: NodeInput) -> ActionResult:
         raise NotImplementedError("oracle mode not yet implemented for ActAgent")

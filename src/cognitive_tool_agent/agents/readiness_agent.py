@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from ..adapters.base import AgentMode, ModelAdapter
+from ..graph.node_input import NodeInput
 from ..schemas.common import Confidence, UserInput
 from ..schemas.reason import ReasoningResult
 from ..schemas.readiness import ReadinessResult
 from ..tools.registry import ToolRegistry
+from ._stub_heuristics import CONFIRMATION_KEYWORDS
 
 
 _CONFIRMATION_REQUIRED_TOOLS = {"cancel_order"}
@@ -17,24 +19,17 @@ class ReadinessAgent:
         self.mode = mode
         self._adapter = model_adapter
 
-    def run(
-        self,
-        user_input: UserInput,
-        reasoning: ReasoningResult | None,
-        registry: ToolRegistry,
-    ) -> ReadinessResult:
+    def run(self, ctx: NodeInput) -> ReadinessResult:
         if self.mode == "llm":
-            return self._run_llm(user_input, reasoning, registry)
+            return self._run_llm(ctx)
         if self.mode == "oracle":
-            return self._run_oracle(user_input, reasoning, registry)
-        return self._run_stub(user_input, reasoning, registry)
+            return self._run_oracle(ctx)
+        return self._run_stub(ctx)
 
-    def _run_stub(
-        self,
-        user_input: UserInput,
-        reasoning: ReasoningResult | None,
-        registry: ToolRegistry,
-    ) -> ReadinessResult:
+    def _run_stub(self, ctx: NodeInput) -> ReadinessResult:
+        user_input = ctx.user_input
+        reasoning = ctx.reasoning
+        registry = ctx.registry
         if reasoning is None or reasoning.selected_tool is None:
             return ReadinessResult(
                 ready=False,
@@ -66,7 +61,7 @@ class ReadinessAgent:
                 "pending_confirmation" in user_input.world_state
                 or any(
                     kw in user_input.message.lower()
-                    for kw in ("yes", "confirm", "go ahead", "please cancel")
+                    for kw in CONFIRMATION_KEYWORDS
                 )
             )
             if not has_confirmation:
@@ -89,18 +84,8 @@ class ReadinessAgent:
             confidence=Confidence(score=confidence_score, reason="stub readiness check"),
         )
 
-    def _run_llm(
-        self,
-        user_input: UserInput,
-        reasoning: ReasoningResult | None,
-        registry: ToolRegistry,
-    ) -> ReadinessResult:
+    def _run_llm(self, ctx: NodeInput) -> ReadinessResult:
         raise NotImplementedError("llm mode not yet implemented for ReadinessAgent")
 
-    def _run_oracle(
-        self,
-        user_input: UserInput,
-        reasoning: ReasoningResult | None,
-        registry: ToolRegistry,
-    ) -> ReadinessResult:
+    def _run_oracle(self, ctx: NodeInput) -> ReadinessResult:
         raise NotImplementedError("oracle mode not yet implemented for ReadinessAgent")

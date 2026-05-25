@@ -1,0 +1,49 @@
+[
+  {
+    "row_id": "tc-001",
+    "action_type": "tool_executed",
+    "tool_name": "get_order_status",
+    "tool_arguments": {
+      "order_id": "A1234?"
+    },
+    "plan_next_action": "execute_tool",
+    "reasoning_selected_tool": "get_order_status"
+  },
+  {
+    "row_id": "tc-002",
+    "action_type": "followup_asked",
+    "tool_name": null,
+    "tool_arguments": null,
+    "plan_next_action": "ask_followup",
+    "reasoning_selected_tool": "cancel_order"
+  },
+  {
+    "row_id": "tc-003",
+    "action_type": "tool_executed",
+    "tool_name": "update_address",
+    "tool_arguments": {
+      "order_id": "B5678",
+      "new_address": "Change the shipping address for order #B5678 to 42 Maple Street, Springfield."
+    },
+    "plan_next_action": "execute_tool",
+    "reasoning_selected_tool": "update_address"
+  },
+  {
+    "row_id": "tc-004",
+    "action_type": "tool_executed",
+    "tool_name": "cancel_order",
+    "tool_arguments": {
+      "order_id": "C9012."
+    },
+    "plan_next_action": "execute_tool",
+    "reasoning_selected_tool": "cancel_order"
+  },
+  {
+    "row_id": "tc-005",
+    "action_type": "rejected",
+    "tool_name": null,
+    "tool_arguments": null,
+    "plan_next_action": "reject",
+    "reasoning_selected_tool": null
+  }
+]

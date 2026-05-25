@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import Counter
 
+from ..schemas.act import ACTION_TYPE_TO_NEXT_ACTION
 from ..schemas.dataset import DatasetRow
 from ..schemas.graph_builder import FailureMap, RowFailure
 from ..schemas.trace import CognitiveTrace
@@ -56,14 +57,7 @@ def _analyze_row(
             explanation="Executor produced no ActionResult",
         )
 
-    action_type_map = {
-        "tool_executed": "execute_tool",
-        "followup_asked": "ask_followup",
-        "answered_directly": "answer_directly",
-        "abstained": "abstain",
-        "rejected": "reject",
-    }
-    actual_action = action_type_map.get(trace.action.action_type, trace.action.action_type)
+    actual_action = ACTION_TYPE_TO_NEXT_ACTION.get(trace.action.action_type, trace.action.action_type)
 
     if actual_action != expected_action:
         failure_stage, failure_type, explanation = _classify_mismatch(

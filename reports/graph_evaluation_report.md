@@ -1,6 +1,6 @@
 # Graph Evaluation Report
 
-_Generated: 2026-05-25 13:26 UTC_
+_Generated: 2026-05-25 17:44 UTC_
 
 **Source dataset**: `data/out/action_sequence.jsonl`  
 **Rows evaluated**: 98
@@ -9,7 +9,7 @@ _Generated: 2026-05-25 13:26 UTC_
 
 | Graph | Nodes | E2E Success | Tool Acc | Arg Match | Policy Viol | Failures | Grounding |
 |---|---:|---:|---:|---:|---:|---:|---|
-| `monolithic` | 1 | 0% | 0% | 0% | 0% | 98 | n/a |
+| `monolithic` | 2 | 0% | 0% | 0% | 0% | 98 | n/a |
 | `minimal` | 3 | 0% | 0% | 0% | 0% | 98 | n/a |
 | `recommended_stub` | 7 | 0% | 0% | 0% | 0% | 98 | stub |
 | `recommended_oracle` | 7 | 0% | 0% | 0% | 0% | 98 | oracle |

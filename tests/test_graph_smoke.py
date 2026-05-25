@@ -104,12 +104,13 @@ def test_tradeoff_summary_scores_in_range(report):
 
 def test_executor_node_driven_monolithic(rows):
     from cognitive_tool_agent.graph.cognitive_graph import GraphExecutor
-    from cognitive_tool_agent.graph_builder.graph_candidate_generator import _make_monolithic
+    from cognitive_tool_agent.graph_builder.graph_candidate_generator import make_monolithic
+    from cognitive_tool_agent.schemas.experiment import ExperimentSpec
     from cognitive_tool_agent.tools.fake_tools import DEFAULT_REGISTRY
 
-    candidate = _make_monolithic()
+    candidate = make_monolithic()
     executor = GraphExecutor()
-    trace = executor.run(candidate.graph_spec, rows[0], DEFAULT_REGISTRY)
+    trace = executor.run(ExperimentSpec(graph=candidate.graph_spec), rows[0], DEFAULT_REGISTRY)
 
     assert trace.input is not None
     assert trace.action is not None
@@ -119,12 +120,13 @@ def test_executor_node_driven_monolithic(rows):
 
 def test_executor_node_driven_full_pipeline(rows):
     from cognitive_tool_agent.graph.cognitive_graph import GraphExecutor
-    from cognitive_tool_agent.graph_builder.graph_candidate_generator import _make_full_pipeline
+    from cognitive_tool_agent.graph_builder.graph_candidate_generator import make_full_pipeline
+    from cognitive_tool_agent.schemas.experiment import ExperimentSpec
     from cognitive_tool_agent.tools.fake_tools import DEFAULT_REGISTRY
 
-    candidate = _make_full_pipeline()
+    candidate = make_full_pipeline()
     executor = GraphExecutor()
-    trace = executor.run(candidate.graph_spec, rows[0], DEFAULT_REGISTRY)
+    trace = executor.run(ExperimentSpec(graph=candidate.graph_spec), rows[0], DEFAULT_REGISTRY)
 
     assert trace.input is not None
     assert trace.perception is not None
@@ -137,13 +139,14 @@ def test_executor_node_driven_full_pipeline(rows):
 
 def test_happy_path_row_executes_tool(rows):
     from cognitive_tool_agent.graph.cognitive_graph import GraphExecutor
-    from cognitive_tool_agent.graph_builder.graph_candidate_generator import _make_full_pipeline
+    from cognitive_tool_agent.graph_builder.graph_candidate_generator import make_full_pipeline
+    from cognitive_tool_agent.schemas.experiment import ExperimentSpec
     from cognitive_tool_agent.tools.fake_tools import DEFAULT_REGISTRY
 
     happy_row = next(r for r in rows if r.id == "tc-001")
-    candidate = _make_full_pipeline()
+    candidate = make_full_pipeline()
     executor = GraphExecutor()
-    trace = executor.run(candidate.graph_spec, happy_row, DEFAULT_REGISTRY)
+    trace = executor.run(ExperimentSpec(graph=candidate.graph_spec), happy_row, DEFAULT_REGISTRY)
 
     assert trace.action is not None
     assert trace.action.action_type == "tool_executed"
@@ -152,13 +155,14 @@ def test_happy_path_row_executes_tool(rows):
 
 def test_unsupported_action_row_rejects(rows):
     from cognitive_tool_agent.graph.cognitive_graph import GraphExecutor
-    from cognitive_tool_agent.graph_builder.graph_candidate_generator import _make_full_pipeline
+    from cognitive_tool_agent.graph_builder.graph_candidate_generator import make_full_pipeline
+    from cognitive_tool_agent.schemas.experiment import ExperimentSpec
     from cognitive_tool_agent.tools.fake_tools import DEFAULT_REGISTRY
 
     reject_row = next(r for r in rows if r.id == "tc-005")
-    candidate = _make_full_pipeline()
+    candidate = make_full_pipeline()
     executor = GraphExecutor()
-    trace = executor.run(candidate.graph_spec, reject_row, DEFAULT_REGISTRY)
+    trace = executor.run(ExperimentSpec(graph=candidate.graph_spec), reject_row, DEFAULT_REGISTRY)
 
     assert trace.action is not None
     assert trace.action.action_type == "rejected"

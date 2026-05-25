@@ -7,18 +7,25 @@ from ..schemas.graph_spec import EdgeSpec, GraphSpec, NodeSpec
 class GraphCandidateGenerator:
     def generate(self, decomposition: BehaviorDecomposition) -> list[GraphCandidate]:
         candidates = [
-            _make_monolithic(),
-            _make_perceive_plan_act(),
-            _make_full_pipeline(),
+            make_monolithic(),
+            make_perceive_plan_act(),
+            make_full_pipeline(),
         ]
         return candidates
 
 
-def _make_monolithic() -> GraphCandidate:
+def make_monolithic_baseline() -> GraphCandidate:
+    nodes = [
+        NodeSpec(id="plan", role="plan"),
+        NodeSpec(id="act", role="act"),
+    ]
+    edges = [
+        EdgeSpec(from_node="plan", to_node="act"),
+    ]
     graph = GraphSpec(
-        id="graph_A_monolithic",
-        nodes=[NodeSpec(id="monolithic", role="monolithic")],
-        edges=[],
+        id="graph_A_monolithic_baseline",
+        nodes=nodes,
+        edges=edges,
         latency_estimate=1.0,
         cost_estimate=1.0,
     )
@@ -26,15 +33,20 @@ def _make_monolithic() -> GraphCandidate:
         id="candidate_A",
         graph_spec=graph,
         rationale=(
-            "Monolithic baseline: a single node handles perception, reasoning, and planning "
-            "without decomposition. Minimal latency and cost; high coupling."
+            "Monolithic baseline: plan then act, with no perceive/reason/readiness upstream. "
+            "Equivalent to keyword-only planning — the degenerate graph topology. "
+            "Minimal latency and cost; no cognitive decomposition."
         ),
         latency_estimate=1.0,
         cost_estimate=1.0,
     )
 
 
-def _make_perceive_plan_act() -> GraphCandidate:
+def make_monolithic() -> GraphCandidate:
+    return make_monolithic_baseline()
+
+
+def make_perceive_plan_act() -> GraphCandidate:
     nodes = [
         NodeSpec(id="perceive", role="perceive"),
         NodeSpec(id="plan", role="plan"),
@@ -64,7 +76,7 @@ def _make_perceive_plan_act() -> GraphCandidate:
     )
 
 
-def _make_full_pipeline() -> GraphCandidate:
+def make_full_pipeline() -> GraphCandidate:
     nodes = [
         NodeSpec(id="perceive", role="perceive"),
         NodeSpec(id="reason", role="reason"),
@@ -74,11 +86,12 @@ def _make_full_pipeline() -> GraphCandidate:
         NodeSpec(id="learn", role="learn"),
     ]
     edges = [
-        EdgeSpec(from_node="perceive", to_node="reason"),
-        EdgeSpec(from_node="reason", to_node="readiness"),
-        EdgeSpec(from_node="readiness", to_node="plan"),
-        EdgeSpec(from_node="plan", to_node="act"),
-        EdgeSpec(from_node="act", to_node="learn"),
+        EdgeSpec(from_node="perceive",  to_node="reason",    provides="perception"),
+        EdgeSpec(from_node="reason",    to_node="readiness", provides="reasoning"),
+        EdgeSpec(from_node="reason",    to_node="plan",      provides="reasoning"),
+        EdgeSpec(from_node="readiness", to_node="plan",      provides="readiness"),
+        EdgeSpec(from_node="plan",      to_node="act",       provides="plan"),
+        EdgeSpec(from_node="act",       to_node="learn"),
     ]
     graph = GraphSpec(
         id="graph_C_full_pipeline",
