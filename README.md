@@ -7,45 +7,139 @@ This repo explores a concrete thesis:
 > Tool-agent failures are not one blob.  
 > They can be decomposed into measurable cognitive spaces, and the right graph should be justified by dataset evidence, not architectural taste.
 
-The current focus is tau2-style retail tool-agent traces. The repo converts raw simulations into cognitive artifacts, infers capability pressure, recommends a graph, and evaluates graph variants against turn-level tool-call decisions.
+The current focus is tau2-style retail tool-agent traces. The repo converts raw simulations into cognitive artifacts, creates a stratified train/dev/test split, derives a graph from train-only behavioral analysis, freezes that graph, and evaluates it independently across all/train/dev/test.
 
 ---
 
 ## Current status
 
-The repo now has a working evaluation loop:
+The repo now has a working end-to-end experimental harness:
 
 ```text
 tau2 results.json
    ↓
 trace conversion
    ↓
-cognitive dataset artifacts
+simulation profiling + stratified train/dev/test split
    ↓
-dataset reports + capability inference
+TRAIN ONLY:
+  cognitive dataset report
+  capability inference
+  graph recommendation
    ↓
-recommended cognitive graph
+frozen recommended_graph.json
    ↓
-turn-level graph evaluation
+EVALUATION:
+  all / train / dev / test
    ↓
-stub vs deterministic vs oracle comparison
+proof table
 ```
 
-The most important current result:
+Latest full-pipeline run:
+
+```bash
+python scripts/run_pipeline.py
+```
+
+Input:
 
 ```text
-recommended_stub           2% E2E /  0% argument match
-recommended_deterministic 39% E2E / 23% argument match
-recommended_oracle       100% E2E / 99% argument match
+data/raw/simulations/baseline_retail_100/results.json
 ```
 
-This means the system now has a measurable grounding gap:
+Output:
+
+```text
+data/out
+reports
+```
+
+Latest split:
+
+| Split | Turn-level rows |
+|---|---:|
+| all | 547 |
+| train | 349 |
+| dev | 106 |
+| test | 92 |
+
+The graph was derived from train-only behavioral analysis, frozen, then evaluated independently across train/dev/test.
+
+---
+
+## Latest proof table
+
+Same frozen `recommended_graph.json`, evaluated across splits.
+
+### E2E Success
+
+| Variant | all | train | dev | test |
+|---|---:|---:|---:|---:|
+| `recommended_stub` | 2% | 2% | 1% | 2% |
+| `recommended_deterministic` | 39% | 39% | 40% | 37% |
+| `recommended_oracle` | 100% | 100% | 100% | 100% |
+
+### Tool Accuracy
+
+| Variant | all | train | dev | test |
+|---|---:|---:|---:|---:|
+| `recommended_stub` | 2% | 2% | 1% | 2% |
+| `recommended_deterministic` | 39% | 39% | 40% | 37% |
+| `recommended_oracle` | 100% | 100% | 100% | 100% |
+
+### Argument Match
+
+| Variant | all | train | dev | test |
+|---|---:|---:|---:|---:|
+| `recommended_stub` | 0% | 0% | 0% | 0% |
+| `recommended_deterministic` | 23% | 22% | 23% | 24% |
+| `recommended_oracle` | 99% | 98% | 98% | 100% |
+
+Interpretation:
 
 ```text
 stub < deterministic < oracle
 ```
 
-The deterministic grounding node closes a real part of the oracle gap without using labels.
+The deterministic grounding node closes a real part of the oracle gap without using expected labels. The dev/test scores are close to train, which is the important result: the train-derived graph is not only fitting the train split.
+
+---
+
+## Experimental design boundary
+
+This repo now enforces a train-only EDD boundary.
+
+### Rule
+
+```text
+Anything that learns, summarizes, infers, recommends, or shapes the graph uses train only.
+
+Anything that measures performance may run on all/train/dev/test.
+
+tool_registry.json is the only global artifact because it defines the environment/API surface,
+not observed behavior.
+```
+
+### Artifact scopes
+
+| Artifact | Scope | Allowed to influence graph design? |
+|---|---|---:|
+| `tool_registry.json` | global | yes, environment only |
+| `conversion_summary.json` | global descriptive | no |
+| `split_manifest.json` | global descriptive | no |
+| `split_report.md` | all splits, descriptive | no |
+| `cognitive_dataset_report.json` | train only | yes |
+| capability inference | train only | yes |
+| `recommended_graph.json` | derived from train only | yes, frozen before eval |
+| evaluation outputs | all/train/dev/test | no, measurement only |
+
+Verification from the latest run:
+
+```text
+source = "train split (62 sims)" | boundary = train_only
+```
+
+This confirms that `cognitive_dataset_report.json` is not using dev/test simulations.
 
 ---
 
@@ -106,15 +200,13 @@ Current conversion summary:
 
 | Metric | Value |
 |---|---:|
-| Tasks | 100 |
 | Simulations | 100 |
-| Messages | 2,714 |
-| Expected actions | 514 |
-| Actual tool calls | 797 |
-| Matched actions | 427 |
-| Failed actions | 60 |
+| Turn-level tool-call rows | 547 |
+| Train rows | 349 |
+| Dev rows | 106 |
+| Test rows | 92 |
 
-Generated artifacts:
+Generated artifacts include:
 
 ```text
 data/out/tool_registry.json
@@ -122,63 +214,61 @@ data/out/action_sequence.jsonl
 data/out/turn_supervision.jsonl
 data/out/failure_rows.jsonl
 data/out/conversion_summary.json
+data/out/splits/train_simulation_ids.json
+data/out/splits/dev_simulation_ids.json
+data/out/splits/test_simulation_ids.json
+data/out/splits/train_supervision.jsonl
+data/out/splits/dev_supervision.jsonl
+data/out/splits/test_supervision.jsonl
 ```
 
-This proves the raw tau2 traces contain enough structure to extract action-level, turn-level, and failure-level supervision.
+This proves the raw tau2 traces contain enough structure to extract action-level, turn-level, split-level, and failure-level supervision.
 
 ---
 
-### 2. The dataset exposes capability pressure
+### 2. The split is scenario-stratified
 
-The report builder computes cognitive pressure signals from the converted artifacts.
+The pipeline creates a simulation-level train/dev/test split.
 
-Current extended dataset summary:
+The split is stratified by scenario profile, including signals such as:
 
-| Metric | Value |
-|---|---:|
-| Tool entropy | 3.063 bits |
-| Avg tools / simulation | 7.97 |
-| Avg turns before write | 21.1 |
-| Read / write ratio | 4.15 |
+```text
+scenario family
+single_action vs multi_action
+grounding vs no_grounding
+difficulty bucket
+```
 
-Top complexity tools include:
-
-| Tool | Type | Complexity |
-|---|---|---:|
-| modify_user_address | write | 21 |
-| modify_pending_order_address | write | 20 |
-| exchange_delivered_order_items | write | 17 |
-| modify_pending_order_items | write | 17 |
-| return_delivered_order_items | write | 14 |
-| modify_pending_order_payment | write | 13 |
-| cancel_pending_order | write | 12 |
-| get_order_details | read | 8 |
-
-Top argument failure fields:
-
-| Argument | Failure count |
-|---|---:|
-| order_id | 20 |
-| expression | 13 |
-| item_ids | 11 |
-| product_id | 9 |
-| new_item_ids | 7 |
-| state | 7 |
-| zip | 5 |
-| payment_method_id | 4 |
+This matters because a random split could hide important behavior classes in only one split. The goal is not just to split rows. The goal is to preserve behavior-space coverage across train/dev/test.
 
 ---
 
-### 3. Capability inference recommends the full cognitive graph
+### 3. Analysis artifacts are train-only
 
-The recommender infers these capability requirements:
+The cognitive report and graph recommendation are generated from train simulations only.
 
-| Capability | Required | Strength | Evidence |
-|---|---:|---:|---|
-| memory | yes | 0.54 | `order_id` values are heavily tool-chained |
-| grounding | yes | 0.85 | `item_ids` has very high peak grounding pressure |
-| readiness | yes | 0.43 | many failures involve write actions |
-| deep_planning | yes | 0.61 | average chain depth is above threshold |
+Latest run:
+
+```text
+2/5  Build cognitive dataset report  [TRAIN ONLY]
+  ✓ source = "train split (62 sims)" | boundary = train_only
+
+3/5  Recommend graph  [TRAIN ONLY → frozen]
+  ✓ Graph: perceive → reason → grounding → readiness → plan → act → learn
+  ✓ confidence = 0.59
+```
+
+This is the key experimental discipline:
+
+```text
+Design on train.
+Freeze the graph.
+Measure on train/dev/test.
+```
+
+---
+
+### 4. Capability inference recommends the full cognitive graph
 
 Recommended graph:
 
@@ -186,112 +276,155 @@ Recommended graph:
 perceive → reason → grounding → readiness → plan → act → learn
 ```
 
-This graph is not chosen by taste. It is justified by dataset signals.
+The recommendation is not just a hand-drawn architecture. It is derived from train-only cognitive pressure signals, then frozen before evaluation.
 
----
-
-## Why the original graph evaluation was all zero
-
-The first graph evaluation compressed each full simulation into one row:
+This is the first important repo-level claim:
 
 ```text
-first user message → selected primary / final-ish action
-```
-
-That was misaligned.
-
-A typical simulation has many turns and many tool calls. The report showed an average of 21.1 turns before write actions. Asking weak stubs to infer a late write action from the first user message produced all zeros.
-
-This was not a graph failure. It was an evaluation-unit mismatch.
-
----
-
-## Turn-level evaluation
-
-The fix was to evaluate the graph at the correct unit:
-
-```text
-local turn context → next assistant tool call
-```
-
-The new turn-level adapter builds one row per `call_tool` turn from `turn_supervision.jsonl`.
-
-Each row contains:
-
-```text
-user_message
-expected_tool
-expected_arguments
-prior_tool_calls
-prior_tool_results
-conversation_context
-tool registry
-```
-
-This creates 547 turn-level tool-call decision rows.
-
-Example rows:
-
-| Row | Expected tool | Expected args |
-|---|---|---|
-| turn 4 | find_user_id_by_email | email |
-| turn 6 | get_user_details | user_id |
-| turn 10 | get_order_details | order_id |
-| turn 14 | list_all_product_types | `{}` |
-| turn 16 | get_product_details | product_id |
-
----
-
-## Current graph evaluation results
-
-Full 547-row turn-level evaluation:
-
-| Graph | Nodes | E2E Success | Tool Acc | Arg Match | Grounding |
-|---|---:|---:|---:|---:|---|
-| monolithic | 2 | 0% | 0% | 0% | n/a |
-| minimal | 3 | 0% | 0% | 0% | n/a |
-| recommended_stub | 7 | 2% | 2% | 0% | stub |
-| recommended_deterministic | 7 | 39% | 39% | 23% | deterministic |
-| recommended_oracle | 7 | 100% | 100% | 99% | oracle |
-
-This is the first key proof result:
-
-```text
-A dedicated deterministic grounding node improves the graph from 2% to 39% E2E success without using labels.
+Behavioral traces can be used to infer a candidate cognitive topology.
 ```
 
 ---
 
-## Field-level grounding results
+### 5. Deterministic grounding improves the graph
 
-Field-level summary for `recommended_deterministic`:
+The same recommended topology is evaluated with three grounding modes:
 
-| Argument field | Rows with field | Deterministic resolved | Exact match | Resolve rate | Match rate |
-|---|---:|---:|---:|---:|---:|
-| order_id | 234 | 141 | 78 | 60% | 33% |
-| product_id | 64 | 62 | 18 | 97% | 28% |
-| user_id | 108 | 108 | 108 | 100% | 100% |
-| payment_method_id | 86 | 86 | 71 | 100% | 83% |
-| item_ids | 85 | 0 | 0 | 0% | 0% |
-| new_item_ids | 55 | 0 | 0 | 0% | 0% |
+| Variant | Meaning |
+|---|---|
+| `recommended_stub` | Full graph with weak/stub grounding |
+| `recommended_deterministic` | Full graph with deterministic non-label grounding |
+| `recommended_oracle` | Full graph with oracle grounding ceiling |
 
-Interpretation:
+Latest all-split result:
+
+| Variant | E2E Success | Tool Acc | Arg Match |
+|---|---:|---:|---:|
+| `recommended_stub` | 2% | 2% | 0% |
+| `recommended_deterministic` | 39% | 39% | 23% |
+| `recommended_oracle` | 100% | 100% | 99% |
+
+This isolates grounding as a real bottleneck:
 
 ```text
-Solved:
-- user_id grounding
-- much of payment_method_id grounding
-
-Partially solved:
-- order_id grounding
-- product_id grounding
-
-Not solved yet:
-- item_ids
-- new_item_ids
+The graph structure can use better grounding.
+The deterministic grounding node closes part of the oracle gap.
+The remaining gap is measurable.
 ```
 
-This is the point of the architecture: failures are no longer opaque. They are localized by field and capability.
+---
+
+## The full pipeline
+
+Run everything:
+
+```bash
+python scripts/run_pipeline.py \
+  --input data/raw/simulations/baseline_retail_100/results.json
+```
+
+Default phases:
+
+```text
+DESIGN PHASE (train only)
+  1/5  Convert traces + stratified split
+  2/5  Build cognitive dataset report [TRAIN ONLY]
+  3/5  Recommend graph [TRAIN ONLY → frozen]
+  4/5  Build split report [descriptive]
+
+EVALUATION PHASE
+  5/5  Evaluate on all / train / dev / test
+```
+
+Incremental flags:
+
+```bash
+python scripts/run_pipeline.py --skip-convert
+python scripts/run_pipeline.py --skip-reports
+python scripts/run_pipeline.py --skip-recommend
+python scripts/run_pipeline.py --limit 20
+```
+
+The `--limit` flag is useful for smoke tests. It should not be used for claims.
+
+---
+
+## Running individual steps
+
+Convert traces and build splits:
+
+```bash
+python scripts/convert_traces.py \
+  --input data/raw/simulations/baseline_retail_100/results.json \
+  --out-dir data/out
+```
+
+Build cognitive report from train only:
+
+```bash
+python scripts/build_reports.py \
+  --out-dir data/out \
+  --reports-dir reports \
+  --source baseline_retail_100
+```
+
+By default, reports are train-only.
+
+Full-dataset inspection is possible but should not be used for graph design:
+
+```bash
+python scripts/build_reports.py --no-train-only
+```
+
+Recommend graph from the train-only report:
+
+```bash
+python scripts/recommend_graph.py \
+  --report reports/cognitive_dataset_report.json \
+  --out reports/recommended_graph.json
+```
+
+Run turn-level graph evaluation:
+
+```bash
+python scripts/run_turn_graph_evaluation.py
+```
+
+Optional limited run:
+
+```bash
+python scripts/run_turn_graph_evaluation.py --limit 20
+```
+
+Explain one row:
+
+```bash
+python scripts/explain_turn_graph_row.py \
+  --row-index 0 \
+  --graph recommended_deterministic
+```
+
+---
+
+## Current graph variants
+
+The turn-level evaluator compares graph configurations such as:
+
+| Graph | Shape / mode |
+|---|---|
+| `recommended_stub` | full recommended graph with stub grounding |
+| `recommended_deterministic` | full recommended graph with deterministic grounding |
+| `recommended_oracle` | full recommended graph with oracle grounding |
+
+The important comparison is controlled:
+
+```text
+same graph topology
+same evaluation rows
+only grounding mode changes
+```
+
+That makes the stub/deterministic/oracle gap interpretable.
 
 ---
 
@@ -301,11 +434,11 @@ The grounding node currently supports several modes:
 
 | Mode | Meaning |
 |---|---|
-| stub | Returns little/no resolved grounding. Baseline floor. |
-| deterministic | Uses prior tool calls, prior tool results, and explicit text patterns. No labels. |
-| oracle | Copies expected arguments from the dataset row. Ceiling only. |
-| llm | Reserved for future model-backed grounding. |
-| disabled | Used when grounding is intentionally removed. |
+| `stub` | Returns little/no resolved grounding. Baseline floor. |
+| `deterministic` | Uses prior tool calls, prior tool results, and explicit text patterns. No labels. |
+| `oracle` | Copies expected arguments from the dataset row. Ceiling only. |
+| `llm` | Reserved for future model-backed grounding. |
+| `disabled` | Used when grounding is intentionally removed. |
 
 The oracle is not a production solution. It is a measurement instrument.
 
@@ -315,7 +448,7 @@ It answers:
 If grounding were perfect, could the rest of the graph use it?
 ```
 
-The answer is now yes.
+The current answer is yes.
 
 ---
 
@@ -348,17 +481,17 @@ row.expected.expected_arguments
 row.expected.expected_tool
 ```
 
-Current Pass 1 resolves scalar IDs:
+Current Pass 1 resolves scalar IDs such as:
 
 | Field | Strategy |
 |---|---|
-| order_id | prior tool call args, prior tool result JSON, `#W...` regex |
-| user_id | prior tool call args, prior tool result JSON, user-id-like result strings |
-| product_id | prior tool call args, prior tool result JSON, conservative product type matching |
-| payment_method_id | prior tool call args, prior tool result JSON |
+| `order_id` | prior tool call args, prior tool result JSON, order-id regex |
+| `user_id` | prior tool call args, prior tool result JSON, user-id-like result strings |
+| `product_id` | prior tool call args, prior tool result JSON, conservative product type matching |
+| `payment_method_id` | prior tool call args, prior tool result JSON |
 | generic `*_id` | same-key lookup in prior calls/results |
 
-Deferred to Pass 2:
+Deferred to later passes:
 
 ```text
 item_ids
@@ -411,86 +544,41 @@ Each role writes one canonical output slot:
 
 | Role | Output slot |
 |---|---|
-| perceive | perception |
-| reason | reasoning |
-| grounding | grounding |
-| readiness | readiness |
-| plan | plan |
-| act | action |
-| learn | learning |
+| `perceive` | `perception` |
+| `reason` | `reasoning` |
+| `grounding` | `grounding` |
+| `readiness` | `readiness` |
+| `plan` | `plan` |
+| `act` | `action` |
+| `learn` | `learning` |
 
-Each node receives a `NodeInput` containing only the upstream slots allowed by `ROLE_INPUTS`.
+Each node receives a `NodeInput` containing only the upstream slots allowed by the graph wiring.
 
 This makes graph wiring testable. A node cannot silently consume arbitrary context unless the graph declares that dependency.
 
 ---
 
-## Current graph variants
+## Why the original graph evaluation was all zero
 
-The turn-level evaluator compares five graph configurations:
-
-| Graph | Shape / mode |
-|---|---|
-| monolithic | `plan → act` |
-| minimal | `perceive → plan → act` |
-| recommended_stub | full recommended graph with stub grounding |
-| recommended_deterministic | full recommended graph with deterministic grounding |
-| recommended_oracle | full recommended graph with oracle grounding |
-
-The current evidence shows that the full graph only becomes useful when the grounding node is capable.
-
----
-
-## Running the full pipeline
-
-From repo root:
-
-```bash
-python scripts/convert_traces.py \
-  --input data/raw/simulations/baseline_retail_100/results.json \
-  --out-dir data/out
-```
-
-```bash
-python scripts/build_reports.py \
-  --out-dir data/out \
-  --reports-dir reports \
-  --source baseline_retail_100
-```
-
-```bash
-python scripts/recommend_graph.py \
-  --report reports/cognitive_dataset_report.json \
-  --out reports/recommended_graph.json
-```
-
-```bash
-python scripts/run_turn_graph_evaluation.py
-```
-
-Optional limited run:
-
-```bash
-python scripts/run_turn_graph_evaluation.py --limit 20
-```
-
-Explain one row:
-
-```bash
-python scripts/explain_turn_graph_row.py \
-  --row-index 0 \
-  --graph recommended_deterministic
-```
-
-Other graph options:
+The first graph evaluation compressed each full simulation into one row:
 
 ```text
-monolithic
-minimal
-recommended_stub
-recommended_deterministic
-recommended_oracle
+first user message → selected primary / final-ish action
 ```
+
+That was misaligned.
+
+A typical simulation has many turns and many tool calls. Asking weak stubs to infer a late write action from the first user message produced all zeros.
+
+This was not necessarily a graph failure. It was an evaluation-unit mismatch.
+
+The current primary evaluation unit is:
+
+```text
+local turn context → next assistant tool call
+```
+
+This creates 547 turn-level tool-call decision rows.
 
 ---
 
@@ -520,12 +608,14 @@ Recommended workflow:
 
 ```text
 1. Convert traces
-2. Build cognitive reports
-3. Recommend graph
-4. Run turn-level graph evaluation
-5. Inspect field-level failures
-6. Add deterministic or model-backed capability
-7. Reevaluate
+2. Build stratified train/dev/test split
+3. Build train-only cognitive reports
+4. Recommend graph from train-only evidence
+5. Freeze recommended_graph.json
+6. Evaluate frozen graph on train/dev/test
+7. Inspect field-level failures
+8. Add deterministic or model-backed capability
+9. Reevaluate
 ```
 
 Do not optimize prompts before the dataset, metrics, and baseline are stable.
@@ -553,10 +643,12 @@ Current milestone acceptance criteria:
 
 ```text
 all existing tests pass
-turn-level graph evaluation emits five graph rows
+cognitive_dataset_report.json is train-only
+recommended_graph.json is derived from train-only report
+evaluation outputs exist for all/train/dev/test
+same frozen graph is evaluated across splits
 recommended_deterministic beats recommended_stub
-field-level grounding report is produced
-deterministic grounding does not use expected arguments
+oracle remains the measured ceiling
 ```
 
 ---
@@ -570,7 +662,7 @@ Known limitations:
 ```text
 - deterministic grounding is Pass 1 only
 - item_ids and new_item_ids are unresolved
-- product_id grounding is over-eager and often wrong
+- product_id grounding can be over-eager
 - order_id grounding needs safer disambiguation
 - graph evaluation is turn-level, not full tau2 interactive replay
 - no LLM-backed node is implemented yet
@@ -594,15 +686,8 @@ payment_method_id
 Targets:
 
 ```text
-order_id exact match > 33%
-product_id exact match > 28%
 deterministic E2E >= 39%
 wrong-resolution rate decreases
-```
-
-Focus:
-
-```text
 prefer unresolved over wrong
 handle multiple candidate IDs conservatively
 use immediate/local context before broad history
@@ -654,14 +739,23 @@ This should come after the turn-level cognitive spaces are measurable and optimi
 The current honest claim:
 
 ```text
-On 547 tau2 retail turn-level tool-call decisions, the system exposes a large grounding bottleneck.
-A full cognitive graph with stub grounding reaches 2% E2E success.
-The same graph with deterministic grounding reaches 39%.
-The same graph with oracle grounding reaches 100%.
+On 547 tau2 retail turn-level tool-call decisions,
+a graph derived from train-only behavioral analysis was frozen
+and evaluated independently across all/train/dev/test.
+
+The full cognitive graph with stub grounding reaches:
+  2% all / 2% train / 1% dev / 2% test E2E success.
+
+The same frozen graph with deterministic grounding reaches:
+  39% all / 39% train / 40% dev / 37% test E2E success.
+
+The same frozen graph with oracle grounding reaches:
+  100% all / 100% train / 100% dev / 100% test E2E success.
 
 This shows that the dataset contains measurable grounding pressure,
 that the graph can consume improved grounding,
-and that deterministic non-label logic can close part of the oracle gap.
+and that deterministic non-label logic can close part of the oracle gap
+without obvious train-only overfitting in the current split.
 ```
 
 That is the first real proof of the repo’s direction.
@@ -684,5 +778,6 @@ The source of truth is:
 dataset + metrics + controlled comparisons
 ```
 
-A graph is not believed because it looks elegant.  
+A graph is not believed because it looks elegant.
+
 It earns its place only if it moves the right metric on the right behavior slice.
