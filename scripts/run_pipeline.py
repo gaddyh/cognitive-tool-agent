@@ -121,7 +121,11 @@ def _print_proof_table(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Full cognitive pipeline with EDD boundary")
-    parser.add_argument("--input", required=True, help="Raw simulation JSON file")
+    parser.add_argument(
+        "--input",
+        default="data/raw/simulations/baseline_retail_100/results.json",
+        help="Raw simulation JSON file (default: baseline_retail_100)",
+    )
     parser.add_argument("--out-dir", default="data/out")
     parser.add_argument("--reports-dir", default="reports")
     parser.add_argument("--limit", type=int, default=None, help="Limit rows per eval run (smoke test)")
