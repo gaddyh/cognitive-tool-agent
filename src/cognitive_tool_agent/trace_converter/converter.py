@@ -19,6 +19,7 @@ from .failure_extractor import extract_failures
 from .scenario_profiler import profile_simulation
 from .simulation_loader import load_simulation_file
 from .stratified_splitter import assign_splits, stratified_split
+from .timing_extractor import extract_timings
 from .tool_registry_scanner import scan_tool_registry
 from .turn_supervisor import supervise_turns
 
@@ -57,6 +58,10 @@ class TraceConverter:
         out_dir.mkdir(parents=True, exist_ok=True)
         splits_dir = out_dir / "splits"
         splits_dir.mkdir(parents=True, exist_ok=True)
+
+        with input_path.open(encoding="utf-8") as _fh:
+            _raw_data = json.load(_fh)
+        _raw_simulations: list[dict] = _raw_data.get("simulations", [])
 
         sim_file = load_simulation_file(input_path)
         task_map = {t.id: t for t in sim_file.tasks}
@@ -99,6 +104,8 @@ class TraceConverter:
         profiles = assign_splits(profiles_raw, assignments)
         profile_map: dict[str, SimulationProfile] = {p.simulation_id: p for p in profiles}
 
+        timings = extract_timings(_raw_simulations, profile_map)
+
         for row in all_supervision:
             p = profile_map.get(row.simulation_id)
             if p is not None:
@@ -134,6 +141,7 @@ class TraceConverter:
         _write_jsonl(out_dir / "turn_supervision.jsonl", [r.model_dump() for r in all_supervision])
         _write_jsonl(out_dir / "failure_rows.jsonl", [f.model_dump() for f in all_failures])
         _write_json(out_dir / "conversion_summary.json", summary.model_dump())
+        _write_jsonl(out_dir / "simulation_timings.jsonl", [t.model_dump() for t in timings])
 
         _write_jsonl(
             out_dir / "simulation_profiles.jsonl",

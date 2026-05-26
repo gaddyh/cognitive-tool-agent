@@ -1,0 +1,56 @@
+{
+  "generated_at": "2026-05-26 01:32 UTC",
+  "split": "test",
+  "total_rows": 1,
+  "metrics": [
+    {
+      "variant": "deterministic",
+      "split": "test",
+      "total_rows": 1,
+      "required_arg_match": 0.0,
+      "field_precision": 0.0,
+      "field_recall": 0.0,
+      "field_f1": 0.0,
+      "missing_field_rate": 1.0,
+      "hallucinated_id_rate": 0.0,
+      "schema_valid_rate": 1.0,
+      "avg_confidence": null,
+      "avg_latency_ms": 0.0,
+      "estimated_cost_usd": null
+    },
+    {
+      "variant": "grounding_llm_v1",
+      "split": "test",
+      "total_rows": 1,
+      "required_arg_match": 1.0,
+      "field_precision": 1.0,
+      "field_recall": 1.0,
+      "field_f1": 1.0,
+      "missing_field_rate": 0.0,
+      "hallucinated_id_rate": 0.0,
+      "schema_valid_rate": 1.0,
+      "avg_confidence": 1.0,
+      "avg_latency_ms": 1672.5,
+      "estimated_cost_usd": 0.003138
+    }
+  ],
+  "sim_latency": [
+    {
+      "sim_key": "16:075ee962",
+      "turns": 1,
+      "det_total_ms": 0.001,
+      "llm_total_ms": 1672.5,
+      "llm_avg_ms_per_turn": 1672.5
+    }
+  ],
+  "tau_baseline_timing": {
+    "simulation_count": 18,
+    "tau_duration_seconds_total": 339.928,
+    "tau_duration_seconds_avg": 18.885,
+    "tau_agent_generation_time_seconds_total": 213.724,
+    "tau_agent_generation_time_seconds_avg_per_assistant_turn": 1.149,
+    "tau_agent_generation_turns_total": 186,
+    "message_span_seconds_total": 339.91,
+    "message_span_seconds_avg": 18.884
+  }
+}

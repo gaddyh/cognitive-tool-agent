@@ -65,6 +65,7 @@ def main() -> None:
         "turn_supervision.jsonl",
         "failure_rows.jsonl",
         "conversion_summary.json",
+        "simulation_timings.jsonl",
     ]
     split_files = [
         "simulation_profiles.jsonl",
